@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-light-glass: #eef2f9;
+    --bg-dark-canvas: #070b14;
+    --accent-cyan: #38bdf8;
+    --accent-emerald: #10b981;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: #070b14;
+    color: #f8fafc;
+  }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    background-color: #070b14;
+  }
+}
+
+/* Liquid Glass Surface Recipes */
+@layer components {
+  /* Light Opening Liquid Glass */
+  .liquid-glass-light {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.62) 0%,
+      rgba(241, 245, 249, 0.38) 100%
+    );
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border-top: 1px solid rgba(255, 255, 255, 0.85);
+    border-left: 1px solid rgba(255, 255, 255, 0.75);
+    border-right: 1px solid rgba(148, 163, 184, 0.28);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+    box-shadow:
+      0 20px 50px -15px rgba(15, 23, 42, 0.12),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  }
+
+  /* Dark Spatial Intelligence Liquid Glass */
+  .liquid-glass-dark {
+    background: linear-gradient(
+      145deg,
+      rgba(15, 23, 42, 0.74) 0%,
+      rgba(7, 11, 20, 0.62) 100%
+    );
+    backdrop-filter: blur(16px) saturate(135%);
+    -webkit-backdrop-filter: blur(16px) saturate(135%);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow:
+      0 24px 48px -16px rgba(2, 6, 23, 0.78),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* Subtle Glass Pill */
+  .liquid-pill-light {
+    background: rgba(255, 255, 255, 0.56);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.08);
+  }
+
+  .liquid-pill-dark {
+    background: rgba(15, 23, 42, 0.68);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 8px 24px -6px rgba(2, 6, 23, 0.65);
+  }
+}
+
+/* Spatial Aperture Mask for Scene 2 Distorting Object Composition */
+.distortion-aperture-mask {
+  mask-image: radial-gradient(
+    circle at 50% 50%,
+    rgba(0, 0, 0, 1) 36%,
+    rgba(0, 0, 0, 0.82) 54%,
+    rgba(0, 0, 0, 0) 76%
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 50%,
+    rgba(0, 0, 0, 1) 36%,
+    rgba(0, 0, 0, 0.82) 54%,
+    rgba(0, 0, 0, 0) 76%
+  );
+}
+
+/* Ensure Spline canvas fills container cleanly */
+.spline-canvas-wrapper canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
