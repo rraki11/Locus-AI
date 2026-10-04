@@ -13,46 +13,60 @@ function rangeProgress(value: number, start: number, end: number): number {
 export const ExperienceTransition: React.FC<ExperienceTransitionProps> = ({
   scrollProgress,
 }) => {
-  // Active between 0.25 (distortion prominence) and 0.85 (particles dominant)
-  if (scrollProgress <= 0.22 || scrollProgress >= 0.88) {
+  // Active across the scroll bridge from Page 1 into Page 2
+  if (scrollProgress <= 0.04) {
     return null;
   }
 
-  // 0.42 -> 0.62: Light environment transforms into dark environment
-  const lightToDark = rangeProgress(scrollProgress, 0.42, 0.62);
+  // Stage A (0.06 -> 0.52): Pale-mint / LOCUS sage spatial glow & rings emerge first
+  const mintGlowPhase = rangeProgress(scrollProgress, 0.06, 0.52);
+  const mintGlowBell = Math.sin(mintGlowPhase * Math.PI);
 
-  // Bell curve for refractive spatial datum rings peaking around 0.50
-  const phaseT = rangeProgress(scrollProgress, 0.25, 0.78);
-  const ringOpacity = Math.sin(phaseT * Math.PI);
-  const ringScale = 0.78 + phaseT * 0.85;
+  // Stage B (0.14 -> 0.78): Gradual darkening into deep charcoal/navy (#090E14 / #0A1016)
+  const depthDarkening = rangeProgress(scrollProgress, 0.14, 0.78);
+
+  // Stage C (0.12 -> 0.88): LOCUS sage/mint spatial rings remain subtly visible across the depth shift
+  const ringPhase = rangeProgress(scrollProgress, 0.1, 0.88);
+  const ringBell = Math.sin(ringPhase * Math.PI);
+  const ringScale = 0.84 + ringPhase * 0.68;
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-15 overflow-hidden"
+      className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
       aria-hidden="true"
     >
-      {/* Controlled Light -> Dark Spatial Transformation Veil */}
+      {/* 1. Initial Pale-Mint / Sage Spatial Wash (bridges Hero surface into depth) */}
       <div
         className="absolute inset-0"
         style={{
-          opacity: lightToDark * 0.88 * (1 - rangeProgress(scrollProgress, 0.68, 0.84)),
+          opacity: mintGlowBell * 0.65,
           background:
-            'radial-gradient(circle at 55% 50%, rgba(15, 23, 42, 0.92) 0%, rgba(7, 11, 20, 0.98) 60%, rgba(7, 11, 20, 1) 100%)',
+            'radial-gradient(circle at 64% 50%, rgba(111, 175, 155, 0.28) 0%, rgba(215, 225, 221, 0.45) 48%, rgba(244, 247, 246, 0.0) 85%)',
         }}
       />
 
-      {/* Subtle Spatial Calibration Rings Bridging Glassmorph -> Particle Field */}
+      {/* 2. Gradual Deep Charcoal/Navy Spatial Environment (#080C12 -> #0A1016 -> #0C131A) */}
       <div
-        className="absolute inset-0 flex items-center justify-center"
+        className="absolute inset-0"
         style={{
-          opacity: ringOpacity * 0.55,
+          opacity: depthDarkening,
+          background:
+            'radial-gradient(ellipse 80% 75% at 62% 50%, #0C131A 0%, #0A1016 52%, #080C12 100%)',
+        }}
+      />
+
+      {/* 3. Persistent LOCUS Mint/Sage Spatial Calibration Rings visible during darkening */}
+      <div
+        className="absolute inset-0 flex items-center justify-center md:translate-x-[12%]"
+        style={{
+          opacity: ringBell * 0.78,
           transform: `scale(${ringScale})`,
         }}
       >
-        <div className="relative flex h-[440px] w-[440px] items-center justify-center">
-          <div className="absolute inset-0 rounded-full border border-dashed border-[#6FAF9B]/25" />
-          <div className="absolute inset-14 rounded-full border border-[#D7E1DD]/15" />
-          <div className="absolute inset-28 rounded-full border border-[#3D806D]/20" />
+        <div className="relative flex h-[500px] w-[500px] items-center justify-center">
+          <div className="absolute inset-0 rounded-full border border-dashed border-[#6FAF9B]/40 shadow-[0_0_40px_rgba(111,175,155,0.14)]" />
+          <div className="absolute inset-16 rounded-full border border-[#3D806D]/30" />
+          <div className="absolute inset-32 rounded-full border border-[#D7E1DD]/20" />
         </div>
       </div>
     </div>

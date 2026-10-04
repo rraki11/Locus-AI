@@ -59,6 +59,8 @@ interface SpatialNodeDef {
   y: number;
   z: number;
   isPrimary?: boolean;
+  cityLabel?: string;
+  labelSide?: 'left' | 'right';
   stageTag: 'LOCATION' | 'MARKET' | 'GROUND REALITY' | 'INTELLIGENCE';
   connectedTo: string[];
 }
@@ -180,6 +182,8 @@ const SPATIAL_NODES: SpatialNodeDef[] = [
     x: -0.37,
     y: 0.10,
     z: 18,
+    cityLabel: 'MUMBAI',
+    labelSide: 'left',
     stageTag: 'MARKET',
     connectedTo: ['core-south', 'node-nw', 'node-central'],
   },
@@ -188,6 +192,8 @@ const SPATIAL_NODES: SpatialNodeDef[] = [
     x: -0.05,
     y: 0.23,
     z: 20,
+    cityLabel: 'HYDERABAD',
+    labelSide: 'right',
     stageTag: 'GROUND REALITY',
     connectedTo: ['core-south', 'node-west', 'node-north', 'node-east'],
   },
@@ -951,6 +957,9 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
           const dst = nodeMap.get(targetId);
           if (!dst) continue;
 
+          const isExpansionCorridor =
+            (src.id === 'node-central' && dst.id === 'node-west') ||
+            (src.id === 'node-west' && dst.id === 'node-central');
           const connectsToPrimary =
             src.def.isPrimary || Boolean(dst.def.isPrimary);
           const connectsToHovered =
@@ -958,6 +967,7 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
             (src.id === hoveredNodeRef.current ||
               dst.id === hoveredNodeRef.current);
           const isPrimaryArc =
+            isExpansionCorridor ||
             connectsToPrimary ||
             src.id === activeFocusId ||
             dst.id === activeFocusId;
@@ -994,8 +1004,10 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
 
           if (isPrimaryArc || connectsToHovered) {
             const baseOpacity = connectsToHovered
-              ? 0.78
-              : 0.46 + smoothCtaBoost * 0.34 + arcLightBoost * 0.24;
+              ? 0.8
+              : isExpansionCorridor
+              ? 0.62 + smoothCtaBoost * 0.26 + arcLightBoost * 0.18
+              : 0.44 + smoothCtaBoost * 0.34 + arcLightBoost * 0.24;
             const peakOpacity = Math.min(1, baseOpacity + 0.18);
 
             const arcGrad = ctx.createLinearGradient(
@@ -1010,7 +1022,7 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
             );
             arcGrad.addColorStop(
               0.5,
-              `rgba(24, 158, 118, ${peakOpacity.toFixed(3)})`
+              `rgba(20, 158, 116, ${peakOpacity.toFixed(3)})`
             );
             arcGrad.addColorStop(
               1,
@@ -1018,7 +1030,7 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
             );
             ctx.strokeStyle = arcGrad;
             ctx.lineWidth =
-              1.45 +
+              (isExpansionCorridor ? 1.75 : 1.45) +
               smoothCtaBoost * 0.45 +
               (connectsToHovered ? 0.4 : 0) +
               arcLightBoost * 0.3;
@@ -1030,11 +1042,15 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
           }
           ctx.stroke();
 
-          // Slow, Elegant Signal Particles Traveling Toward INTELLIGENCE
+          // Slow, Elegant Signal Particles (HYDERABAD -> MUMBAI corridor + INTELLIGENCE paths)
           if ((isPrimaryArc || arcLightBoost > 0.3) && !preferFallback) {
-            // Orient flow toward the primary INTELLIGENCE node
-            const flowFrom = dst.def.isPrimary ? src : dst;
-            const flowTo = dst.def.isPrimary ? dst : src;
+            // Orient HYDERABAD -> MUMBAI expansion flow explicitly, or toward primary node
+            let flowFrom = dst.def.isPrimary ? src : dst;
+            let flowTo = dst.def.isPrimary ? dst : src;
+            if (isExpansionCorridor) {
+              flowFrom = src.id === 'node-central' ? src : dst; // HYDERABAD
+              flowTo = src.id === 'node-west' ? src : dst; // MUMBAI
+            }
 
             // Slow, calm cadence (~8.5s per traversal, slightly faster when CTA hovered)
             const speed = 0.115 + smoothCtaBoost * 0.035;
@@ -1090,12 +1106,13 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
         }
       }
 
-      // 12. Render Each Spatial Node (Active INTELLIGENCE Node + Cursor Light Proximity)
+      // 12. Render Each Spatial Node (Active INTELLIGENCE Node + HYDERABAD -> MUMBAI Corridor)
       for (let nIdx = 0; nIdx < projectedNodes.length; nIdx++) {
         const node = projectedNodes[nIdx];
         const isHovered = hoveredNodeRef.current === node.id;
         const isSelected = selectedNodeRef.current === node.id;
         const isPrimary = Boolean(node.def.isPrimary);
+        const isCityNode = Boolean(node.def.cityLabel);
         const isConnectedToHovered =
           hoveredNodeRef.current !== null &&
           node.def.connectedTo.includes(hoveredNodeRef.current);
@@ -1114,9 +1131,10 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
           ? 0
           : Math.max(0, Math.sin(t * 0.42 + nIdx * 1.65)) * 0.18;
 
-        // Concentric Local Surface Ring around Primary INTELLIGENCE Node & Hovered/Lit Nodes
+        // Concentric Local Surface Ring around Primary Node, City Corridor Nodes & Hovered/Lit Nodes
         if (
           isPrimary ||
+          isCityNode ||
           isHovered ||
           isSelected ||
           isConnectedToHovered ||
@@ -1126,6 +1144,8 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
             ? 0.132 + smoothCtaBoost * 0.014
             : isHovered
             ? 0.118
+            : isCityNode
+            ? 0.094
             : 0.082;
           ctx.save();
           ctx.beginPath();
@@ -1145,12 +1165,14 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
             ? 0.56 + smoothCtaBoost * 0.24 + nodeLightBoost * 0.15
             : isHovered
             ? 0.58
+            : isCityNode
+            ? 0.34 + smoothCtaBoost * 0.14 + nodeLightBoost * 0.2
             : 0.22 + nodeLightBoost * 0.28;
           ctx.strokeStyle =
             isPrimary || isHovered
               ? `rgba(22, 163, 122, ${Math.min(0.9, ringAlpha).toFixed(3)})`
               : `rgba(61, 128, 109, ${Math.min(0.75, ringAlpha).toFixed(3)})`;
-          ctx.lineWidth = isPrimary || isHovered ? 1.25 : 0.85;
+          ctx.lineWidth = isPrimary || isHovered ? 1.25 : 0.9;
           ctx.stroke();
 
           // Outer subtle precision ring exclusively for the Primary INTELLIGENCE node
@@ -1184,6 +1206,8 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
           ? 34 + smoothCtaBoost * 8 + nodeLightBoost * 5
           : isHovered
           ? 32
+          : isCityNode
+          ? 22 + nodeLightBoost * 6
           : isSelected
           ? 24
           : 15 + nodeLightBoost * 7;
@@ -1229,6 +1253,8 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
           ? 9.2 + (isHovered ? 1.6 : 0) + smoothCtaBoost * 1.1
           : isHovered
           ? 8.4
+          : isCityNode
+          ? 5.8 + nodeLightBoost * 0.8
           : isSelected
           ? 7.2
           : isConnectedToHovered
@@ -1240,12 +1266,14 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
         ctx.fillStyle =
           isPrimary || isHovered || isSelected
             ? 'rgba(13, 37, 31, 0.95)'
+            : isCityNode
+            ? 'rgba(20, 56, 46, 0.92)'
             : nodeLightBoost > 0.35
             ? 'rgba(244, 252, 249, 0.98)'
             : 'rgba(255, 255, 255, 0.94)';
         ctx.fill();
         ctx.strokeStyle =
-          isPrimary || isHovered || isSelected
+          isPrimary || isHovered || isSelected || isCityNode
             ? `rgba(110, 231, 183, ${(0.88 + smoothCtaBoost * 0.12).toFixed(3)})`
             : `rgba(61, 128, 109, ${(0.55 + nodeLightBoost * 0.35).toFixed(3)})`;
         ctx.lineWidth = isPrimary ? 1.65 : 1.45;
@@ -1255,46 +1283,49 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
         ctx.arc(
           node.sx,
           node.sy,
-          isPrimary || isHovered ? 3.4 + smoothCtaBoost * 0.35 : 2.1 + nodeLightBoost * 0.4,
+          isPrimary || isHovered
+            ? 3.4 + smoothCtaBoost * 0.35
+            : isCityNode
+            ? 2.5
+            : 2.1 + nodeLightBoost * 0.4,
           0,
           Math.PI * 2
         );
         ctx.fillStyle =
-          isPrimary || isHovered || isSelected
+          isPrimary || isHovered || isSelected || isCityNode
             ? '#6EE7B7'
             : nodeLightBoost > 0.3
             ? '#229B78'
             : '#3D806D';
         ctx.fill();
 
-        // Crisp floating presentation pill on hovered or primary INTELLIGENCE node
-        if (isHovered || (isPrimary && !hoveredNodeRef.current)) {
-          const labelText = node.def.stageTag;
+        // Subtle, restrained location node labels for HYDERABAD -> MUMBAI (plus hovered node tag)
+        if (isCityNode || isHovered) {
+          const labelText = node.def.cityLabel || node.def.stageTag;
           ctx.save();
-          ctx.font = '600 9.5px "JetBrains Mono", monospace';
+          ctx.font = '600 9px "JetBrains Mono", monospace';
           const textWidth = ctx.measureText(labelText).width;
-          const pillW = textWidth + 20;
-          const pillH = 22;
-          const pillX = node.sx + 14;
+          const pillW = textWidth + 18;
+          const pillH = 20;
+          const isLeft = node.def.labelSide === 'left';
+          const pillX = isLeft ? node.sx - pillW - 12 : node.sx + 12;
           const pillY = node.sy - pillH / 2;
 
           ctx.beginPath();
-          ctx.roundRect(pillX, pillY, pillW, pillH, 11);
-          ctx.fillStyle =
-            isPrimary && smoothCtaBoost > 0.1
-              ? 'rgba(248, 253, 251, 0.95)'
-              : 'rgba(255, 255, 255, 0.90)';
+          ctx.roundRect(pillX, pillY, pillW, pillH, 10);
+          ctx.fillStyle = isHovered
+            ? 'rgba(248, 253, 251, 0.94)'
+            : 'rgba(255, 255, 255, 0.84)';
           ctx.fill();
-          ctx.strokeStyle =
-            isPrimary && smoothCtaBoost > 0.1
-              ? `rgba(22, 163, 122, ${(0.42 + smoothCtaBoost * 0.35).toFixed(3)})`
-              : 'rgba(61, 128, 109, 0.35)';
+          ctx.strokeStyle = isHovered
+            ? 'rgba(22, 163, 122, 0.55)'
+            : 'rgba(61, 128, 109, 0.30)';
           ctx.lineWidth = 1;
           ctx.stroke();
 
           ctx.fillStyle = '#0B1220';
           ctx.textBaseline = 'middle';
-          ctx.fillText(labelText, pillX + 10, node.sy + 0.5);
+          ctx.fillText(labelText, pillX + 9, node.sy + 0.5);
           ctx.restore();
         }
       }
@@ -1345,9 +1376,12 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
     >
       <canvas ref={canvasRef} className="block h-full w-full" />
 
-      {/* Top-Right Restrained Presentation-Only Spatial State Indicator */}
+      {/* Top-Right Product Category Pill */}
       <div className="pointer-events-none absolute right-8 top-8 hidden flex-col items-end gap-1.5 sm:flex">
-        <div className="liquid-pill-light flex items-center gap-2 rounded-full px-3.5 py-1">
+        <div
+          data-locus-zone="GLASS"
+          className="liquid-pill-light flex items-center gap-2 rounded-full px-3.5 py-1"
+        >
           <span
             className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
               activeVisualState === 'intelligence-active' ||
@@ -1357,13 +1391,13 @@ export const LocusSpatialCore: React.FC<LocusSpatialCoreProps> = ({
             }`}
           />
           <span className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.2em] text-[#0B1220]/75">
-            SPATIAL CORE // {activeNodeDef.stageTag}
+            MARKET INTELLIGENCE PLATFORM
           </span>
         </div>
       </div>
 
-      {/* Bottom 4-Stage Visual Flow Legend (Positioned clear of bottom-right mode button) */}
-      <div className="pointer-events-none absolute bottom-6 left-6 hidden items-center gap-2 whitespace-nowrap rounded-full border border-[#0B1220]/10 bg-white/75 px-4 py-1.5 shadow-sm backdrop-blur-md lg:flex xl:left-10">
+      {/* Bottom Centered 4-Stage Visual Flow Legend */}
+      <div className="pointer-events-none absolute bottom-6 left-1/2 hidden -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-[#0B1220]/10 bg-white/75 px-4 py-1.5 shadow-sm backdrop-blur-md lg:flex">
         {(
           ['LOCATION', 'MARKET', 'GROUND REALITY', 'INTELLIGENCE'] as const
         ).map((stage, idx) => {

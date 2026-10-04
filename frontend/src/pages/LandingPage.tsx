@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { HeroExperience } from '../components/landing/HeroExperience';
+import { MarketSystemSection } from '../components/marketSystem/MarketSystemSection';
+import { MarketDiscoveryView } from '../components/discovery/MarketDiscoveryView';
 import { ExperienceTransition } from '../components/transitions/ExperienceTransition';
-import { WorkspacePage } from './WorkspacePage';
 
 interface LandingPageProps {
   onEnterWorkspace?: () => void;
@@ -9,10 +10,11 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = () => {
   const heroTrackRef = useRef<HTMLDivElement>(null);
-  const workspaceAnchorRef = useRef<HTMLDivElement>(null);
+  const marketSystemAnchorRef = useRef<HTMLDivElement>(null);
+  const marketDiscoveryAnchorRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState<number>(0);
+  const [activeSection, setActiveSection] = useState<'page1' | 'page2' | 'view1'>('page1');
   const [reducedMotion, setReducedMotion] = useState<boolean>(false);
-  const [manualFallback, setManualFallback] = useState<boolean>(false);
 
   // Detect OS prefers-reduced-motion preference
   useEffect(() => {
@@ -27,7 +29,8 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Measure continuous transition progress (0.00 -> 1.00) from Hero into Workspace
+  // Measure continuous transition progress (0.00 -> 1.00) from Page 1 (Hero) into Page 2 (Market System)
+  // and detect when View 1 (Market Discovery Workspace) is in view.
   useEffect(() => {
     let rafId: number | null = null;
 
@@ -36,10 +39,25 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
       if (!track) return;
 
       const rect = track.getBoundingClientRect();
-      const transitionDistance = Math.max(1, window.innerHeight * 0.85);
+      const transitionDistance = Math.max(1, window.innerHeight * 0.55);
       const rawProgress = -rect.top / transitionDistance;
       const clamped = Math.min(1, Math.max(0, rawProgress));
       setScrollProgress(clamped);
+
+      const discoveryEl = marketDiscoveryAnchorRef.current;
+      if (discoveryEl) {
+        const discoveryRect = discoveryEl.getBoundingClientRect();
+        if (discoveryRect.top <= window.innerHeight * 0.45) {
+          setActiveSection('view1');
+          return;
+        }
+      }
+
+      if (clamped >= 0.55) {
+        setActiveSection('page2');
+      } else {
+        setActiveSection('page1');
+      }
     };
 
     const onScroll = () => {
@@ -63,9 +81,19 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
     };
   }, []);
 
-  // Fast, smooth transition from Hero into the LOCUS Intelligence Workspace
+  // Smooth transition from Page 1 (Hero) into Page 2 (Understand the Market)
   const handleExploreMarket = useCallback(() => {
-    const anchor = workspaceAnchorRef.current;
+    const anchor = marketSystemAnchorRef.current;
+    if (!anchor) return;
+    anchor.scrollIntoView({
+      behavior: reducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }, [reducedMotion]);
+
+  // Smooth transition from Page 2 into View 1 (01 / Market Discovery Workspace)
+  const handleEnterDiscovery = useCallback(() => {
+    const anchor = marketDiscoveryAnchorRef.current;
     if (!anchor) return;
     anchor.scrollIntoView({
       behavior: reducedMotion ? 'auto' : 'smooth',
@@ -80,15 +108,14 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
     });
   }, [reducedMotion]);
 
-  const preferFallback = reducedMotion || manualFallback;
-  const isWorkspaceActive = scrollProgress >= 0.55;
+  const preferFallback = reducedMotion;
 
   return (
-    <div className="relative w-full bg-[#06090E]">
-      {/* SECTION 1: Preserved Opening Hero + Smooth Light-to-Dark Spatial Transition */}
+    <div className="relative w-full bg-[#080C12]">
+      {/* PAGE 1: Preserved Opening Hero + Smooth Pale-Mint to Charcoal/Navy Spatial Transition */}
       <div
         ref={heroTrackRef}
-        className="relative h-[135vh] w-full select-none"
+        className="relative h-[155vh] w-full select-none bg-[#F4F7F6]"
       >
         <div className="sticky top-0 h-screen w-full overflow-hidden">
           <div
@@ -106,68 +133,81 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
           </div>
 
           {!reducedMotion && (
-            <ExperienceTransition scrollProgress={scrollProgress * 0.7} />
+            <ExperienceTransition scrollProgress={scrollProgress * 0.85} />
           )}
         </div>
       </div>
 
-      {/* SECTION 2: Continuous LOCUS Intelligence Workspace (Directly After Hero) */}
+      {/* PAGE 2: Understand the Market — Dark Spatial Intelligence Environment */}
       <div
-        id="locus-workspace"
-        ref={workspaceAnchorRef}
-        className="relative z-20 min-h-screen w-full bg-[#06090E]"
+        id="understand-the-market"
+        ref={marketSystemAnchorRef}
+        className="relative z-20 min-h-screen w-full bg-[#0A1016]"
       >
-        <WorkspacePage
-          onBack={handleScrollToTop}
-          embeddedInLanding={true}
-          externalReducedMotion={preferFallback}
+        <MarketSystemSection
+          scrollProgress={scrollProgress}
+          preferFallback={preferFallback}
+          onBackToHero={handleScrollToTop}
+          onEnterDiscovery={handleEnterDiscovery}
         />
       </div>
 
-      {/* Right-Edge Stage Indicator (Hero vs Workspace) */}
+      {/* VIEW 1: First Real Product Workspace — Setup + Market Discovery + Location Map */}
+      <div
+        id="market-discovery-workspace"
+        ref={marketDiscoveryAnchorRef}
+        className="relative z-20 min-h-screen w-full border-t border-white/[0.08] bg-[#080C12]"
+      >
+        <MarketDiscoveryView
+          preferFallback={preferFallback}
+          onBackToPage2={handleExploreMarket}
+        />
+      </div>
+
+      {/* Right-Edge Stage Indicator (Page 1 Vision, Page 2 Understand the Market, View 1 Market Discovery) */}
       <nav
         aria-label="Experience Stage Navigation"
-        className="pointer-events-auto fixed right-5 top-1/2 z-50 hidden -translate-y-1/2 flex-col items-center gap-3 sm:flex"
+        className="pointer-events-auto fixed right-4 top-1/2 z-50 hidden -translate-y-1/2 flex-col items-center gap-3 sm:flex"
       >
         <button
           type="button"
           onClick={handleScrollToTop}
-          aria-label="Opening Hero Experience"
-          title="01 — LOCUS AI Opening Hero"
-          className={`h-8 w-1.5 rounded-full transition-all duration-300 ${
-            !isWorkspaceActive
+          aria-label="Page 1 — LOCUS AI Vision"
+          title="01 — Know where to grow before you spend"
+          className={`h-7 w-1.5 rounded-full transition-all duration-300 ${
+            activeSection === 'page1'
               ? 'bg-[#0B1220] shadow-sm'
-              : 'bg-slate-600/50 hover:bg-slate-400'
+              : 'bg-slate-500/40 hover:bg-slate-300/70'
           }`}
         />
         <button
           type="button"
           onClick={handleExploreMarket}
-          aria-label="LOCUS Intelligence Workspace"
-          title="02 — LOCUS Intelligence Workspace"
-          className={`h-8 w-1.5 rounded-full transition-all duration-300 ${
-            isWorkspaceActive
+          aria-label="Page 2 — Understand the Market"
+          title="02 — Every market is a spatial system"
+          className={`h-7 w-1.5 rounded-full transition-all duration-300 ${
+            activeSection === 'page2'
               ? 'bg-[#6FAF9B] shadow-[0_0_12px_rgba(111,175,155,0.5)]'
-              : 'bg-slate-400/50 hover:bg-slate-600'
+              : activeSection === 'page1'
+              ? 'bg-[#0B1220]/25 hover:bg-[#3D806D]/60'
+              : 'bg-slate-500/40 hover:bg-slate-300/70'
+          }`}
+        />
+        <button
+          type="button"
+          onClick={handleEnterDiscovery}
+          aria-label="View 1 — Market Discovery Workspace"
+          title="View 1 — 01 / Market Discovery"
+          className={`h-7 w-1.5 rounded-full transition-all duration-300 ${
+            activeSection === 'view1'
+              ? 'bg-[#6FAF9B] shadow-[0_0_12px_rgba(111,175,155,0.65)]'
+              : activeSection === 'page1'
+              ? 'bg-[#0B1220]/20 hover:bg-[#3D806D]/60'
+              : 'bg-slate-500/40 hover:bg-slate-300/70'
           }`}
         />
       </nav>
-
-      {/* Discreet Render Mode Toggle */}
-      <div className="pointer-events-auto fixed bottom-4 right-5 z-50">
-        <button
-          type="button"
-          onClick={() => setManualFallback((prev) => !prev)}
-          className={`rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors ${
-            isWorkspaceActive
-              ? 'border border-white/10 bg-slate-900/75 text-slate-400 hover:border-white/25 hover:text-slate-200'
-              : 'border border-[#0B1220]/10 bg-[#F1F4F3]/75 text-[#0B1220]/70 hover:border-[#0B1220]/25 hover:text-[#0B1220]'
-          } backdrop-blur-md`}
-          title="Toggle between 3D Spatial WebGL / Live Light-Field and Static Fallback"
-        >
-          {preferFallback ? 'Mode: Lightweight Fallback' : 'Mode: 3D Spatial WebGL'}
-        </button>
-      </div>
     </div>
   );
 };
+

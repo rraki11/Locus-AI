@@ -155,14 +155,10 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
     };
   }, [preferFallback]);
 
-  // 0.00 -> 0.15: Opening holds steady; 0.15 -> 0.38: Opening text fades out
-  const textFadeProgress = rangeProgress(scrollProgress, 0.12, 0.38);
-  const heroTextOpacity = 1 - textFadeProgress;
-  const heroTextTranslateY = textFadeProgress * -56;
-
-  // 0.42 -> 0.64: Light environment transforms into dark workspace environment
-  const scene1FadeOut = rangeProgress(scrollProgress, 0.42, 0.64);
-  const scene1Opacity = 1 - scene1FadeOut;
+  // Unified scroll fade-out so left-side text and right-side Spatial Core fade & move in exact lockstep
+  const heroFadeProgress = rangeProgress(scrollProgress, 0.1, 0.54);
+  const heroOpacity = 1 - heroFadeProgress;
+  const heroTranslateY = heroFadeProgress * -36;
 
   return (
     <section
@@ -173,7 +169,7 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       {/* LAYER 1: Subtle Architectural Geospatial Grid & Soft Ambient Background */}
       <div
         className="pointer-events-none absolute inset-0 overflow-hidden"
-        style={{ opacity: scene1Opacity }}
+        style={{ opacity: heroOpacity }}
         aria-hidden="true"
       >
         {/* Very faint editorial coordinate grid */}
@@ -199,7 +195,7 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       {/* LAYER 1.5: Subtle Context-Aware Liquid Light Cursor Field */}
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ opacity: scene1Opacity }}
+        style={{ opacity: heroOpacity }}
       >
         <HeroLiquidLightField
           heroClientPointerRef={heroClientPointerRef}
@@ -212,8 +208,8 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       <div
         className="absolute inset-y-0 right-0 z-10 w-full md:w-[54%] lg:w-[52%] xl:w-[50%]"
         style={{
-          opacity: scene1Opacity,
-          transform: `translate3d(0, ${textFadeProgress * -24}px, 0)`,
+          opacity: heroOpacity,
+          transform: `translate3d(0, ${heroTranslateY}px, 0)`,
         }}
       >
         <LocusSpatialCore
@@ -228,8 +224,8 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       <div
         className="pointer-events-none relative z-20 mx-auto flex h-full max-w-[1560px] flex-col justify-between px-6 py-8 sm:px-10 lg:px-16 lg:py-11"
         style={{
-          opacity: heroTextOpacity,
-          transform: `translate3d(0, ${heroTextTranslateY}px, 0)`,
+          opacity: heroOpacity,
+          transform: `translate3d(0, ${heroTranslateY}px, 0)`,
         }}
       >
         {/* Top Minimal Brand Signature */}
