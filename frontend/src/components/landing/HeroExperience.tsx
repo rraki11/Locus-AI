@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { GlassCTA } from './GlassCTA';
+import {
+  HeroLightZone,
+  HeroLiquidLightField,
+} from './HeroLiquidLightField';
 import { LocusSpatialCore } from './LocusSpatialCore';
 
 interface HeroExperienceProps {
@@ -26,15 +30,17 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
   const heroSectionRef = useRef<HTMLElement>(null);
   // Page/window-level normalized pointer [-1, +1]
   const heroPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  // Raw client pointer coordinates for 3D node proximity hover even through foreground layers
+  // Raw client pointer coordinates + deterministic visual zone for LocusSpatialCore & HeroLiquidLightField
   const heroClientPointerRef = useRef<{
     clientX: number;
     clientY: number;
     active: boolean;
+    zone?: HeroLightZone;
   }>({
     clientX: 0,
     clientY: 0,
     active: false,
+    zone: 'BACKGROUND',
   });
 
   const [isCtaHovered, setIsCtaHovered] = useState<boolean>(false);
@@ -50,7 +56,41 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       };
     };
 
-    const updateFromClientCoords = (clientX: number, clientY: number) => {
+    const resolveDeterministicZone = (
+      normX: number,
+      normY: number,
+      target: EventTarget | null
+    ): HeroLightZone => {
+      const el = target instanceof Element ? target : null;
+      const explicitZone = el
+        ?.closest('[data-locus-zone]')
+        ?.getAttribute('data-locus-zone') as HeroLightZone | null;
+      if (explicitZone) {
+        return explicitZone;
+      }
+
+      // Spatial Core instrument region on right half (centered around X ~ 0.72, Y ~ 0.50)
+      const coreDist = Math.hypot(
+        (normX - 0.72) / 0.21,
+        (normY - 0.5) / 0.37
+      );
+      if (coreDist <= 1.0) {
+        return 'SPATIAL_CORE';
+      }
+
+      // Left-side editorial headline & supporting copy region
+      if (normX >= 0.04 && normX <= 0.42 && normY >= 0.28 && normY <= 0.62) {
+        return 'TEXT_NAV';
+      }
+
+      return 'BACKGROUND';
+    };
+
+    const updateFromClientCoords = (
+      clientX: number,
+      clientY: number,
+      target: EventTarget | null
+    ) => {
       const rect = heroSectionRef.current?.getBoundingClientRect();
       const width =
         rect && rect.width > 0 ? rect.width : window.innerWidth || 1920;
@@ -70,25 +110,23 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
         return;
       }
 
-      const pointerX = Math.max(
-        -1,
-        Math.min(1, ((clientX - left) / Math.max(1, width)) * 2 - 1)
-      );
-      const pointerY = Math.max(
-        -1,
-        Math.min(1, ((clientY - top) / Math.max(1, height)) * 2 - 1)
-      );
+      const normX = Math.max(0, Math.min(1, (clientX - left) / Math.max(1, width)));
+      const normY = Math.max(0, Math.min(1, (clientY - top) / Math.max(1, height)));
+
+      const pointerX = normX * 2 - 1;
+      const pointerY = normY * 2 - 1;
 
       heroPointerRef.current = { x: pointerX, y: pointerY };
       heroClientPointerRef.current = {
         clientX,
         clientY,
         active: true,
+        zone: resolveDeterministicZone(normX, normY, target),
       };
     };
 
     const handlePointerMove = (event: PointerEvent | MouseEvent) => {
-      updateFromClientCoords(event.clientX, event.clientY);
+      updateFromClientCoords(event.clientX, event.clientY, event.target);
     };
 
     const handleWindowMouseOut = (event: MouseEvent) => {
@@ -158,6 +196,18 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
         />
       </div>
 
+      {/* LAYER 1.5: Subtle Context-Aware Liquid Light Cursor Field */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ opacity: scene1Opacity }}
+      >
+        <HeroLiquidLightField
+          heroClientPointerRef={heroClientPointerRef}
+          isCtaHovered={isCtaHovered}
+          preferFallback={preferFallback}
+        />
+      </div>
+
       {/* LAYER 2: Right-Side Fixed Spatial Instrument "LOCUS Spatial Core" */}
       <div
         className="absolute inset-y-0 right-0 z-10 w-full md:w-[54%] lg:w-[52%] xl:w-[50%]"
@@ -184,7 +234,10 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       >
         {/* Top Minimal Brand Signature */}
         <header className="flex items-center justify-between">
-          <div className="liquid-pill-light pointer-events-auto inline-flex items-center gap-2.5 rounded-full px-4 py-1.5">
+          <div
+            data-locus-zone="GLASS"
+            className="liquid-pill-light pointer-events-auto inline-flex items-center gap-2.5 rounded-full px-4 py-1.5"
+          >
             <span
               className="h-2 w-2 rounded-full bg-[#3D806D]"
               aria-hidden="true"
@@ -211,7 +264,10 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
             ground-level visual intelligence.
           </p>
 
-          <div className="mt-8 flex items-center gap-4">
+          <div
+            data-locus-zone="CTA"
+            className="mt-8 flex items-center gap-4"
+          >
             <GlassCTA
               label="EXPLORE A MARKET"
               onClick={onExploreClick}
@@ -227,6 +283,7 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
         <div className="flex items-center justify-between text-[#0B1220]/75">
           <button
             type="button"
+            data-locus-zone="TEXT_NAV"
             onClick={onExploreClick}
             className="pointer-events-auto group inline-flex items-center gap-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-[#0B1220]/75 transition-colors hover:text-[#0B1220] focus:outline-none"
           >
