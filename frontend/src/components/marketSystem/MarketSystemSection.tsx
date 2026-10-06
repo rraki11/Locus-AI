@@ -9,6 +9,8 @@ import {
 export interface MarketSystemSectionProps {
   /** Scroll transition progress (0 = top of Page 1, 1 = fully inside Page 2) */
   scrollProgress?: number;
+  /** Scroll transition progress from Page 2 into Page 3 (0 = fully inside Page 2, 1 = fully inside Page 3) */
+  exitProgress?: number;
   preferFallback?: boolean;
   onBackToHero?: () => void;
   onEnterDiscovery?: () => void;
@@ -23,6 +25,7 @@ const CONCEPTUAL_SEQUENCE = [
 
 export const MarketSystemSection: React.FC<MarketSystemSectionProps> = ({
   scrollProgress = 1,
+  exitProgress = 0,
   preferFallback = false,
   onBackToHero,
   onEnterDiscovery,
@@ -105,45 +108,83 @@ export const MarketSystemSection: React.FC<MarketSystemSectionProps> = ({
     };
   }, [preferFallback]);
 
-  // Smooth emergence curve as the user scrolls from Page 1 into Page 2
+  // Smooth emergence curve as the user scrolls from Page 1 into Page 2,
+  // paired with smooth depth recession as the user enters Page 3
   const entryProgress = Math.min(
     1,
     Math.max(0, (scrollProgress - 0.18) / 0.52)
   );
-  const contentTranslateY = preferFallback ? 0 : (1 - entryProgress) * 26;
-  const stageScale = preferFallback ? 1 : 0.96 + entryProgress * 0.04;
-  const stageOpacity = preferFallback ? 1 : 0.4 + entryProgress * 0.6;
+  const exitPhase = Math.min(1, Math.max(0, exitProgress));
+  const exitEase = 1 - Math.pow(1 - exitPhase, 2);
+
+  const contentTranslateY = preferFallback
+    ? 0
+    : (1 - entryProgress) * 26 - exitEase * 24;
+  const contentOpacity = preferFallback ? 1 : 1 - exitEase * 0.52;
+  const stageScale = preferFallback
+    ? 1
+    : (0.96 + entryProgress * 0.04) * (1 - exitEase * 0.038);
+  const stageOpacity = preferFallback
+    ? 1
+    : (0.4 + entryProgress * 0.6) * (1 - exitEase * 0.55);
 
   return (
     <section
       ref={sectionRef}
       aria-label="Understand the Market — Spatial Intelligence Layer"
-      className="relative min-h-screen w-full overflow-hidden bg-[#0A1016] text-[#F1F5F9] select-none"
+      className="relative min-h-screen w-full overflow-hidden bg-[#080914] text-[#F8FAFC] select-none"
       style={{
         background:
-          'radial-gradient(ellipse 85% 75% at 62% 50%, #0C131A 0%, #0A1016 54%, #080C12 100%)',
+          'radial-gradient(ellipse 88% 78% at 64% 50%, #111328 0%, #090B18 54%, #060710 100%)',
       }}
     >
-      {/* LAYER 1: Subtle Dark Spatial Coordinate Grid & Tonal LOCUS Sage Ambient Field */}
+      {/* LAYER 1: Prismatic Obsidian Spatial Grid & Multi-Spectrum Volumetric Field */}
       <div
         className="pointer-events-none absolute inset-0 overflow-hidden"
         aria-hidden="true"
       >
         <div
-          className="absolute inset-0 opacity-[0.26]"
+          className="absolute inset-0 opacity-[0.28]"
           style={{
             backgroundImage:
-              'linear-gradient(to right, rgba(215, 225, 221, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(215, 225, 221, 0.04) 1px, transparent 1px)',
+              'linear-gradient(to right, rgba(192, 132, 252, 0.045) 1px, transparent 1px), linear-gradient(to bottom, rgba(56, 189, 248, 0.04) 1px, transparent 1px)',
             backgroundSize: '64px 64px',
           }}
         />
 
-        {/* Soft volumetric sage/mint spatial depth wash anchored behind the right-side 3D stage */}
+        {/* Upper-left violet/magenta dispersion bloom echoing the upper 3D star */}
         <div
-          className="absolute left-[68%] top-[50%] h-[820px] w-[900px] -translate-x-1/2 -translate-y-1/2"
+          className="absolute left-[56%] top-[36%] h-[680px] w-[720px] -translate-x-1/2 -translate-y-1/2"
           style={{
             background:
-              'radial-gradient(ellipse 52% 48% at 50% 50%, rgba(61, 128, 109, 0.14) 0%, rgba(111, 175, 155, 0.06) 46%, rgba(12, 19, 26, 0.0) 78%)',
+              'radial-gradient(ellipse 52% 48% at 50% 50%, rgba(192, 132, 252, 0.16) 0%, rgba(217, 70, 239, 0.07) 44%, rgba(9, 11, 24, 0.0) 76%)',
+          }}
+        />
+
+        {/* Lower-right electric cyan & rose-coral dispersion bloom echoing the lower 3D star */}
+        <div
+          className="absolute left-[74%] top-[64%] h-[640px] w-[700px] -translate-x-1/2 -translate-y-1/2"
+          style={{
+            background:
+              'radial-gradient(ellipse 50% 48% at 50% 50%, rgba(56, 189, 248, 0.14) 0%, rgba(244, 114, 182, 0.06) 46%, rgba(9, 11, 24, 0.0) 78%)',
+          }}
+        />
+
+        {/* Subtle left editorial ambient wash so the left typography sits inside the same luminous atmosphere */}
+        <div
+          className="absolute left-[18%] top-[48%] h-[520px] w-[560px] -translate-x-1/2 -translate-y-1/2"
+          style={{
+            background:
+              'radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.08) 0%, rgba(56, 189, 248, 0.04) 48%, rgba(8, 9, 20, 0.0) 76%)',
+          }}
+        />
+
+        {/* Bottom-edge obsidian feather into Page 3 (#030208) so there is zero horizontal seam */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-36"
+          style={{
+            background:
+              'linear-gradient(to bottom, rgba(6, 7, 16, 0) 0%, rgba(4, 3, 12, 0.68) 58%, #030208 100%)',
           }}
         />
       </div>
@@ -152,23 +193,24 @@ export const MarketSystemSection: React.FC<MarketSystemSectionProps> = ({
       <div
         className="relative z-10 mx-auto flex min-h-screen max-w-[1560px] flex-col justify-between px-6 py-8 sm:px-10 lg:px-16 lg:py-11"
         style={{
-          transform: `translate3d(0, ${contentTranslateY}px, 0)`,
+          opacity: contentOpacity,
+          transform: `translate3d(0, ${contentTranslateY.toFixed(1)}px, 0)`,
         }}
       >
-        {/* Top Minimal Dark Glass Section Header */}
+        {/* Top Minimal Prismatic Obsidian Glass Section Header */}
         <header className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-[#0C131A]/80 px-4 py-1.5 shadow-[0_8px_24px_-6px_rgba(0,0,0,0.65)] backdrop-blur-md">
+          <div className="inline-flex items-center gap-2.5 rounded-full border border-[#C084FC]/30 bg-[#0B0E1D]/85 px-4 py-1.5 shadow-[0_8px_28px_-6px_rgba(12,8,28,0.8),inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md">
             <span
-              className="h-2 w-2 rounded-full bg-[#6FAF9B]"
+              className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#C084FC] via-[#E879F9] to-[#38BDF8] shadow-[0_0_10px_rgba(217,70,239,0.85)]"
               aria-hidden="true"
             />
-            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#F1F5F9]">
+            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#F8FAFC]">
               LOCUS AI
             </span>
             <span className="text-white/20" aria-hidden="true">
               /
             </span>
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6FAF9B]">
+            <span className="bg-gradient-to-r from-[#C084FC] via-[#E879F9] to-[#38BDF8] bg-clip-text font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-transparent">
               02 — SPATIAL SYSTEM
             </span>
           </div>
@@ -177,9 +219,9 @@ export const MarketSystemSection: React.FC<MarketSystemSectionProps> = ({
             <button
               type="button"
               onClick={onBackToHero}
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#0C131A]/80 px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D7E1DD]/80 shadow-sm backdrop-blur-md transition-colors hover:border-[#6FAF9B]/40 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-[#C084FC]/25 bg-[#0B0E1D]/80 px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#E2E8F0]/85 shadow-sm backdrop-blur-md transition-colors hover:border-[#38BDF8]/55 hover:text-white"
             >
-              <ArrowUp className="h-3 w-3 text-[#6FAF9B]" aria-hidden="true" />
+              <ArrowUp className="h-3 w-3 text-[#C084FC]" aria-hidden="true" />
               <span>Vision</span>
             </button>
           )}
@@ -189,13 +231,21 @@ export const MarketSystemSection: React.FC<MarketSystemSectionProps> = ({
         <div className="my-auto grid grid-cols-1 items-center gap-10 py-6 lg:grid-cols-12 lg:gap-8">
           {/* LEFT COLUMN: Editorial Narrative */}
           <div className="lg:col-span-5">
-            <p className="font-mono text-xs font-semibold uppercase tracking-[0.26em] text-[#6FAF9B]">
-              UNDERSTAND THE MARKET
-            </p>
+            <div className="inline-flex items-center gap-2">
+              <span
+                className="h-1.5 w-1.5 rotate-45 bg-gradient-to-tr from-[#D946EF] to-[#38BDF8] shadow-[0_0_8px_rgba(217,70,239,0.8)]"
+                aria-hidden="true"
+              />
+              <p className="bg-gradient-to-r from-[#C084FC] via-[#F472B6] to-[#38BDF8] bg-clip-text font-mono text-xs font-semibold uppercase tracking-[0.26em] text-transparent">
+                UNDERSTAND THE MARKET
+              </p>
+            </div>
 
             <h2 className="mt-3 font-display text-4xl font-bold leading-[1.08] tracking-[-0.03em] text-[#F8FAFC] sm:text-5xl lg:text-[52px]">
               Every market is a{' '}
-              <span className="text-[#6FAF9B]">spatial system.</span>
+              <span className="bg-gradient-to-r from-[#C084FC] via-[#E879F9] to-[#38BDF8] bg-clip-text text-transparent drop-shadow-[0_0_26px_rgba(192,132,252,0.28)]">
+                spatial system.
+              </span>
             </h2>
 
             <p className="mt-5 max-w-md text-base font-normal leading-relaxed text-[#CBD5E1]/90 sm:text-[17px]">
@@ -205,28 +255,35 @@ export const MarketSystemSection: React.FC<MarketSystemSectionProps> = ({
             </p>
 
             {/* Small Conceptual Sequence: LOCATION -> MARKET -> SIGNALS -> INTELLIGENCE */}
-            <div className="mt-8 inline-flex flex-wrap items-center gap-2 rounded-2xl border border-[#6FAF9B]/25 bg-[#0C131A]/90 px-4 py-3 shadow-[0_16px_36px_-12px_rgba(0,0,0,0.7)] backdrop-blur-md">
-              {CONCEPTUAL_SEQUENCE.map((step, index) => (
-                <React.Fragment key={step}>
-                  <span
-                    className={`font-mono text-[11px] font-semibold uppercase tracking-[0.18em] ${
-                      step === 'INTELLIGENCE'
-                        ? 'text-[#6FAF9B]'
-                        : 'text-[#E2E8F0]'
-                    }`}
-                  >
-                    {step}
-                  </span>
-                  {index < CONCEPTUAL_SEQUENCE.length - 1 && (
+            <div className="mt-8 inline-flex flex-wrap items-center gap-2 rounded-2xl border border-[#C084FC]/30 bg-[linear-gradient(135deg,rgba(15,18,38,0.92)_0%,rgba(10,13,26,0.94)_100%)] px-4 py-3 shadow-[0_18px_40px_-12px_rgba(10,8,26,0.85),0_0_28px_-10px_rgba(192,132,252,0.22),inset_0_1px_0_0_rgba(255,255,255,0.12)] backdrop-blur-md">
+              {CONCEPTUAL_SEQUENCE.map((step, index) => {
+                const stepColorClass =
+                  step === 'INTELLIGENCE'
+                    ? 'bg-gradient-to-r from-[#E879F9] to-[#38BDF8] bg-clip-text text-transparent font-bold'
+                    : step === 'SIGNALS'
+                    ? 'text-[#F472B6]'
+                    : step === 'MARKET'
+                    ? 'text-[#D8B4FE]'
+                    : 'text-[#F1F5F9]';
+
+                return (
+                  <React.Fragment key={step}>
                     <span
-                      className="font-mono text-xs text-[#6FAF9B]/75"
-                      aria-hidden="true"
+                      className={`font-mono text-[11px] font-semibold uppercase tracking-[0.18em] ${stepColorClass}`}
                     >
-                      →
+                      {step}
                     </span>
-                  )}
-                </React.Fragment>
-              ))}
+                    {index < CONCEPTUAL_SEQUENCE.length - 1 && (
+                      <span
+                        className="font-mono text-xs text-[#C084FC]/80"
+                        aria-hidden="true"
+                      >
+                        →
+                      </span>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
           </div>
 
@@ -251,20 +308,22 @@ export const MarketSystemSection: React.FC<MarketSystemSectionProps> = ({
         </div>
 
         {/* Bottom Subtle Spatial Hierarchy Footer */}
-        <footer className="flex items-center justify-between border-t border-white/[0.07] pt-4 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[#94A3B8]">
-          <span>LOCUS SPATIAL INTELLIGENCE LAYER</span>
+        <footer className="flex items-center justify-between border-t border-[#C084FC]/15 pt-4 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[#94A3B8]">
+          <span className="text-[#CBD5E1]/75">
+            LOCUS SPATIAL INTELLIGENCE LAYER
+          </span>
           <div className="flex items-center gap-4">
-            <span className="hidden md:inline">
+            <span className="hidden text-[#CBD5E1]/70 md:inline">
               CITY → LOCAL AREA → CANDIDATE LOCATION → GROUND REALITY
             </span>
             {onEnterDiscovery && (
               <button
                 type="button"
                 onClick={onEnterDiscovery}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#6FAF9B]/35 bg-[#0C131A]/90 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6FAF9B] transition-colors hover:border-[#6FAF9B]/70 hover:text-white"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#C084FC]/40 bg-[linear-gradient(135deg,rgba(192,132,252,0.14)_0%,rgba(56,189,248,0.14)_100%)] px-3.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#E9D5FF] shadow-[0_0_20px_-6px_rgba(192,132,252,0.4)] transition-all hover:border-[#38BDF8]/70 hover:text-white"
               >
                 <span>01 / Market Discovery</span>
-                <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                <ArrowDown className="h-3 w-3 text-[#38BDF8]" aria-hidden="true" />
               </button>
             )}
           </div>

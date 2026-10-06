@@ -10,5 +10,9 @@ frontend/dist/
 # Environment & OS
 .env
 .env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 .DS_Store
 Thumbs.db

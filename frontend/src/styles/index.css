@@ -44,22 +44,66 @@
       inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
   }
 
-  /* Dark Spatial Intelligence Liquid Glass */
+  /* Dark Spatial Intelligence Primary Liquid Glass (Indigo / Rose-Violet / Warm Amber Looping Vibe) */
   .liquid-glass-dark {
+    background:
+      radial-gradient(
+        120% 90% at 15% 0%,
+        rgba(192, 132, 252, 0.12) 0%,
+        rgba(79, 70, 229, 0.08) 42%,
+        rgba(6, 5, 18, 0) 78%
+      ),
+      radial-gradient(
+        95% 80% at 88% 100%,
+        rgba(249, 115, 22, 0.09) 0%,
+        rgba(217, 70, 239, 0.05) 45%,
+        rgba(6, 5, 18, 0) 80%
+      ),
+      linear-gradient(
+        155deg,
+        rgba(12, 10, 28, 0.56) 0%,
+        rgba(6, 5, 16, 0.48) 100%
+      );
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border-top: 1px solid rgba(216, 180, 254, 0.28);
+    border-left: 1px solid rgba(129, 140, 248, 0.24);
+    border-right: 1px solid rgba(251, 146, 60, 0.14);
+    border-bottom: 1px solid rgba(251, 146, 60, 0.12);
+    box-shadow:
+      0 28px 64px -18px rgba(2, 1, 8, 0.84),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.20),
+      inset 0 -12px 28px -12px rgba(249, 115, 22, 0.07);
+  }
+
+  /* Secondary Floating Control Glass (Map HUD & Navigation) */
+  .liquid-glass-control {
     background: linear-gradient(
       145deg,
-      rgba(15, 23, 42, 0.74) 0%,
-      rgba(7, 11, 20, 0.62) 100%
+      rgba(16, 13, 36, 0.80) 0%,
+      rgba(8, 7, 20, 0.72) 100%
     );
-    backdrop-filter: blur(16px) saturate(135%);
-    -webkit-backdrop-filter: blur(16px) saturate(135%);
-    border-top: 1px solid rgba(255, 255, 255, 0.16);
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border-top: 1px solid rgba(216, 180, 254, 0.26);
+    border-left: 1px solid rgba(129, 140, 248, 0.20);
+    border-right: 1px solid rgba(251, 146, 60, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow:
-      0 24px 48px -16px rgba(2, 6, 23, 0.78),
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+      0 14px 32px -10px rgba(2, 1, 8, 0.78),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+  }
+
+  /* Tertiary Subtle Recessed Input / Metadata Surface */
+  .liquid-glass-subtle {
+    background: rgba(8, 6, 20, 0.54);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    border-left: 1px solid rgba(129, 140, 248, 0.10);
+    border-right: 1px solid rgba(255, 255, 255, 0.09);
+    border-bottom: 1px solid rgba(192, 132, 252, 0.20);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.48);
   }
 
   /* Subtle Glass Pill */
@@ -72,12 +116,59 @@
   }
 
   .liquid-pill-dark {
-    background: rgba(15, 23, 42, 0.68);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 8px 24px -6px rgba(2, 6, 23, 0.65);
+    background: rgba(12, 10, 28, 0.68);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(216, 180, 254, 0.24);
+    border-left: 1px solid rgba(129, 140, 248, 0.18);
+    border-right: 1px solid rgba(251, 146, 60, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow:
+      0 10px 26px -6px rgba(2, 1, 8, 0.75),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
   }
+}
+
+@keyframes locusLoopWavePrimary {
+  0%,
+  100% {
+    transform: translate3d(0%, 0%, 0) rotate(-22deg) scale(1);
+  }
+  50% {
+    transform: translate3d(9%, 7%, 0) rotate(-12deg) scale(1.12);
+  }
+}
+
+@keyframes locusLoopWaveSecondary {
+  0%,
+  100% {
+    transform: translate3d(0%, 0%, 0) rotate(-16deg) scale(1);
+  }
+  50% {
+    transform: translate3d(-9%, -7%, 0) rotate(-26deg) scale(1.14);
+  }
+}
+
+@keyframes locusLoopWaveAmber {
+  0%,
+  100% {
+    transform: translate3d(0%, 0%, 0) rotate(-26deg) scale(1);
+  }
+  50% {
+    transform: translate3d(-8%, -6%, 0) rotate(-14deg) scale(1.16);
+  }
+}
+
+.locus-loop-wave-primary {
+  animation: locusLoopWavePrimary 9s ease-in-out infinite;
+}
+
+.locus-loop-wave-secondary {
+  animation: locusLoopWaveSecondary 11s ease-in-out infinite;
+}
+
+.locus-loop-wave-amber {
+  animation: locusLoopWaveAmber 8s ease-in-out infinite;
 }
 
 /* Spatial Aperture Mask for Scene 2 Distorting Object Composition */

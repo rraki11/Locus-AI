@@ -3,69 +3,60 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   BaselinePoiNode,
-  CandidateLocationOption,
-  CityMarketOption,
+  CandidateLocationAnalysis,
   LOCUS_SPATIAL_RINGS,
-  LocalAreaOption,
+  NormalizedBaselinePlace,
+  SpatialBandKey,
 } from '../../data/marketDiscoveryData';
 
 export interface MarketDiscoveryMapProps {
-  city: CityMarketOption;
-  localArea: LocalAreaOption;
-  selectedCandidate: CandidateLocationOption;
-  customPinCoords: { lat: number; lng: number } | null;
-  onSelectCandidate: (candidateId: string) => void;
-  onPlaceCustomPin: (coords: { lat: number; lng: number }) => void;
+  analysis: CandidateLocationAnalysis;
+  onUpdateCoordinates: (coords: { lat: number; lng: number }) => void;
   preferFallback?: boolean;
 }
 
 type RingViewScope = 'ground' | 'local' | 'wider';
 
-const POI_CATEGORY_STYLE: Record<
-  BaselinePoiNode['category'],
-  { color: string; shortTag: string }
+const SPATIAL_BAND_MARKER_STYLE: Record<
+  SpatialBandKey,
+  { color: string; glow: string; badgeLabel: string }
 > = {
-  COMPETITOR: {
-    color: '#38BDF8',
-    shortTag: 'POI // F&B',
+  '0-300m': {
+    color: '#FB923C',
+    glow: 'rgba(251, 146, 60, 0.85)',
+    badgeLabel: '0–300m · Ground Reality',
   },
-  COMMERCIAL_POI: {
-    color: '#60A5FA',
-    shortTag: 'POI // RETAIL',
+  '300m-2km': {
+    color: '#818CF8',
+    glow: 'rgba(129, 140, 248, 0.80)',
+    badgeLabel: '300m–2km · Local Market',
   },
-  TRANSIT_NODE: {
-    color: '#A78BFA',
-    shortTag: 'TRANSIT',
-  },
-  ANCHOR_HUB: {
-    color: '#34D399',
-    shortTag: 'ANCHOR',
+  '2-5km': {
+    color: '#E879F9',
+    glow: 'rgba(232, 121, 249, 0.68)',
+    badgeLabel: '2–5km · Wider Market',
   },
 };
 
-/**
- * Compute a destination [lat, lng] offset by bearing & meters
- * for placing clean spatial ring labels on the map without overlapping pins.
- */
-function offsetByMeters(
-  lat: number,
-  lng: number,
-  northMeters: number,
-  eastMeters = 0
-): [number, number] {
-  const deltaLat = northMeters / 111320;
-  const deltaLng =
-    eastMeters / (111320 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
-  return [lat + deltaLat, lng + deltaLng];
+const POI_CATEGORY_COLOR: Record<BaselinePoiNode['category'], string> = {
+  COMPETITOR: '#818CF8',
+  COMMERCIAL_POI: '#60A5FA',
+  TRANSIT_NODE: '#E879F9',
+  ANCHOR_HUB: '#FB923C',
+};
+
+interface HoveredMapEntity {
+  id: string;
+  name: string;
+  subLabel: string;
+  bandLabel: string;
+  distanceLabel?: string;
+  sourceLabel?: string;
 }
 
 export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
-  city,
-  localArea,
-  selectedCandidate,
-  customPinCoords,
-  onSelectCandidate,
-  onPlaceCustomPin,
+  analysis,
+  onUpdateCoordinates,
   preferFallback = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -73,20 +64,26 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
   const overlaysGroupRef = useRef<L.LayerGroup | null>(null);
 
   const [activeScope, setActiveScope] = useState<RingViewScope>('local');
-  const [hoveredPoi, setHoveredPoi] = useState<BaselinePoiNode | null>(null);
+  const [hoveredEntity, setHoveredEntity] = useState<HoveredMapEntity | null>(
+    null
+  );
   const [tilesReady, setTilesReady] = useState<boolean>(false);
 
-  const activeLat = customPinCoords ? customPinCoords.lat : selectedCandidate.lat;
-  const activeLng = customPinCoords ? customPinCoords.lng : selectedCandidate.lng;
+  const { lat: activeLat, lng: activeLng } = analysis.coordinates;
+  const isResolved = analysis.locationStatus === 'RESOLVED';
+  const baselinePlaces: NormalizedBaselinePlace[] =
+    analysis.marketBaseline?.places ?? [];
 
-  // Initialize Leaflet map once with standard OpenStreetMap tiles (dark-filtered via CSS)
+  // Initialize Leaflet map once
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container || mapInstanceRef.current) return;
 
+    const initialZoom = isResolved ? 15 : 5;
+
     const map = L.map(container, {
       center: [activeLat, activeLng],
-      zoom: 16,
+      zoom: initialZoom,
       zoomControl: false,
       attributionControl: true,
       preferCanvas: true,
@@ -101,7 +98,7 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     const tileLayer = L.tileLayer(
       'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
-        attribution: '&copy; OpenStreetMap contributors',
+        attribution: '&copy; OpenStreetMap',
         maxZoom: 19,
       }
     );
@@ -128,13 +125,13 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     };
   }, []);
 
-  // Bind map click to allow placing/updating candidate location within the neighborhood
+  // Clicking anywhere on the map places/moves the candidate location
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     const handleMapClick = (e: L.LeafletMouseEvent) => {
-      onPlaceCustomPin({
+      onUpdateCoordinates({
         lat: Number(e.latlng.lat.toFixed(5)),
         lng: Number(e.latlng.lng.toFixed(5)),
       });
@@ -144,316 +141,351 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     return () => {
       map.off('click', handleMapClick);
     };
-  }, [onPlaceCustomPin]);
+  }, [onUpdateCoordinates]);
 
-  // Smooth camera movement when city, localArea, candidate, or scope changes
+  // Smooth camera response when coordinates, hierarchy level, or spatial scope change
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    const targetZoom =
-      activeScope === 'ground' ? 17 : activeScope === 'local' ? 16 : 13;
+    let targetZoom = 15;
+    if (!isResolved || analysis.cameraLevel === 'country') {
+      targetZoom = 5;
+    } else if (analysis.cameraLevel === 'state') {
+      targetZoom = 7;
+    } else if (analysis.cameraLevel === 'city') {
+      targetZoom =
+        activeScope === 'ground' ? 16 : activeScope === 'local' ? 14 : 12;
+    } else {
+      targetZoom =
+        activeScope === 'ground' ? 17 : activeScope === 'local' ? 15 : 13;
+    }
 
     if (preferFallback) {
       map.setView([activeLat, activeLng], targetZoom, { animate: false });
     } else {
       map.flyTo([activeLat, activeLng], targetZoom, {
-        duration: 0.7,
+        duration: 0.65,
         easeLinearity: 0.25,
       });
     }
   }, [
-    city.id,
-    localArea.id,
     activeLat,
     activeLng,
     activeScope,
+    analysis.cameraLevel,
+    isResolved,
     preferFallback,
   ]);
 
-  // Render Local Area boundary polygon, arterial roads, 3 LOCUS spatial rings, DATABASE POIs, and Candidate Markers
+  // Render Local Area boundary, 3 Spatial Catchment Rings, Normalized Competitor Places, and Draggable Candidate Pin
   useEffect(() => {
     const group = overlaysGroupRef.current;
     if (!group) return;
 
     group.clearLayers();
 
-    // 1. Local Area / Neighborhood Boundary Polygon
-    const boundaryPolygon = L.polygon(localArea.boundaryPolygon, {
-      color: '#6FAF9B',
-      weight: 1.8,
-      opacity: 0.8,
-      dashArray: '6 6',
-      fillColor: '#3D806D',
-      fillOpacity: 0.06,
-    });
-    boundaryPolygon.addTo(group);
-
-    // 2. Arterial Corridors (Road network baseline context)
-    localArea.arterialCorridors.forEach((corridor) => {
-      L.polyline(corridor.path, {
-        color: '#38BDF8',
-        weight: 2.2,
-        opacity: 0.42,
-        dashArray: '5 8',
-      }).addTo(group);
-    });
-
-    // 3. Three LOCUS Spatial Catchment Rings around the active candidate location
-    [...LOCUS_SPATIAL_RINGS].reverse().forEach((ring) => {
-      L.circle([activeLat, activeLng], {
-        radius: ring.radiusMeters,
-        color: ring.strokeColor,
-        weight: ring.id === 'ground-reality' ? 2.2 : 1.4,
-        opacity: ring.id === 'ground-reality' ? 0.92 : 0.65,
-        fillColor: ring.strokeColor,
-        fillOpacity:
-          ring.id === 'ground-reality'
-            ? 0.12
-            : ring.id === 'local-market'
-            ? 0.04
-            : 0.015,
-        dashArray: ring.dashArray,
+    // 1. Local Area Boundary Polygon (when resolved to locality/candidate)
+    if (isResolved && analysis.boundaryPolygon.length > 0) {
+      L.polygon(analysis.boundaryPolygon, {
+        color: '#C084FC',
+        weight: 1.2,
+        opacity: 0.48,
+        dashArray: '6 6',
+        fillColor: '#4F46E5',
+        fillOpacity: 0.03,
         interactive: false,
       }).addTo(group);
+    }
 
-      // Ring scale callout pill positioned cleanly along the northern perimeter of each ring
-      const labelPos = offsetByMeters(
-        activeLat,
-        activeLng,
-        ring.radiusMeters,
-        0
-      );
-      const ringLabelIcon = L.divIcon({
-        className: 'locus-map-clean-icon',
-        html: `<div style="
-          display:inline-flex;
-          align-items:center;
-          gap:5px;
-          padding:2px 8px;
-          border-radius:6px;
-          background:rgba(8,12,18,0.92);
-          border:1px solid ${ring.strokeColor}77;
-          color:#E2E8F0;
-          font-family:'JetBrains Mono',monospace;
-          font-size:9px;
-          letter-spacing:0.12em;
-          white-space:nowrap;
-          transform:translate(-50%, -50%);
-          box-shadow:0 4px 12px rgba(0,0,0,0.65);
-        ">
-          <span style="color:${ring.strokeColor};font-weight:700;">${ring.rangeLabel}</span>
-          <span style="opacity:0.45;">·</span>
-          <span>${ring.stageTitle}</span>
-        </div>`,
-        iconSize: [140, 20],
-        iconAnchor: [0, 0],
+    // 2. Arterial Corridors (when available in baseline context)
+    if (isResolved) {
+      analysis.arterialCorridors.forEach((corridor) => {
+        L.polyline(corridor.path, {
+          color: '#818CF8',
+          weight: 1.8,
+          opacity: 0.34,
+          dashArray: '5 8',
+          interactive: false,
+        }).addTo(group);
       });
-      L.marker(labelPos, { icon: ringLabelIcon, interactive: false }).addTo(
-        group
-      );
-    });
+    }
 
-    // 4. Surrounding Baseline DATABASE POI & Transit Nodes (Quadrant-staggered so labels never collide with center pin)
-    selectedCandidate.surroundingNodes.forEach((poi) => {
-      const style = POI_CATEGORY_STYLE[poi.category];
-      const isNorth = poi.lat >= activeLat;
-      const isEast = poi.lng >= activeLng;
-      const translateX = isEast ? '8px' : 'calc(-100% - 8px)';
-      const translateY = isNorth ? 'calc(-100% - 6px)' : '6px';
-
-      const poiIcon = L.divIcon({
-        className: 'locus-map-clean-icon',
-        html: `<div style="position:relative;width:10px;height:10px;">
-          <span style="
-            position:absolute;
-            left:-5px;
-            top:-5px;
-            width:10px;
-            height:10px;
-            border-radius:999px;
-            background:${style.color};
-            border:2px solid #080C12;
-            box-shadow:0 0 10px ${style.color};
-          "></span>
-          <div style="
-            position:absolute;
-            left:0;
-            top:0;
-            transform:translate(${translateX}, ${translateY});
-            display:inline-flex;
-            align-items:center;
-            gap:5px;
-            padding:2.5px 7px;
-            border-radius:6px;
-            background:rgba(10,16,22,0.92);
-            border:1px solid ${style.color}66;
-            color:#E2E8F0;
-            font-family:'JetBrains Mono',monospace;
-            font-size:8.5px;
-            white-space:nowrap;
-            box-shadow:0 4px 12px rgba(0,0,0,0.65);
-          ">
-            <span style="color:${style.color};font-weight:700;">${style.shortTag}</span>
-            <span>${poi.name}</span>
-          </div>
-        </div>`,
-        iconSize: [10, 10],
-        iconAnchor: [0, 0],
+    // 3. Three Spatial Catchment Rings Centered on Candidate Coordinates
+    // (0-300m Ground Reality, 300m-2km Local Market, 2-5km Wider Market)
+    if (isResolved) {
+      [...LOCUS_SPATIAL_RINGS].reverse().forEach((ring) => {
+        L.circle([activeLat, activeLng], {
+          radius: ring.radiusMeters,
+          color: ring.strokeColor,
+          weight: ring.id === 'ground-reality' ? 2.2 : 1.35,
+          opacity: ring.id === 'ground-reality' ? 0.92 : 0.56,
+          fillColor: ring.strokeColor,
+          fillOpacity:
+            ring.id === 'ground-reality'
+              ? 0.09
+              : ring.id === 'local-market'
+              ? 0.035
+              : 0.015,
+          dashArray: ring.dashArray,
+          interactive: false,
+        }).addTo(group);
       });
+    }
 
-      const marker = L.marker([poi.lat, poi.lng], { icon: poiIcon });
-      marker.on('mouseover', () => setHoveredPoi(poi));
-      marker.on('mouseout', () =>
-        setHoveredPoi((prev) => (prev?.id === poi.id ? null : prev))
-      );
-      marker.addTo(group);
-    });
+    // 4A. Normalized Competitor Places from Market Baseline Engine
+    if (isResolved && baselinePlaces.length > 0) {
+      baselinePlaces.forEach((place, idx) => {
+        const bandStyle = SPATIAL_BAND_MARKER_STYLE[place.spatial_band];
+        const showInlineChip =
+          place.spatial_band === '0-300m' ||
+          (place.spatial_band === '300m-2km' && idx < 6);
+        const isNorth = place.latitude >= activeLat;
+        const isEast = place.longitude >= activeLng;
+        const translateX = isEast ? '10px' : 'calc(-100% - 10px)';
+        const translateY = isNorth ? 'calc(-100% - 5px)' : '5px';
 
-    // 5. Secondary Candidate Locations in this Local Area
-    localArea.candidates.forEach((cand) => {
-      const isSelected =
-        !customPinCoords && cand.id === selectedCandidate.id;
+        const dotSize = place.spatial_band === '0-300m' ? 11 : 9;
+        const halfDot = dotSize / 2;
 
-      if (isSelected) return;
+        const competitorIcon = L.divIcon({
+          className: 'locus-map-clean-icon',
+          html: `<div data-testid="competitor-map-marker" data-band="${place.spatial_band}" style="position:relative;width:${dotSize}px;height:${dotSize}px;">
+            <span style="
+              position:absolute;
+              left:-${halfDot}px;
+              top:-${halfDot}px;
+              width:${dotSize}px;
+              height:${dotSize}px;
+              border-radius:999px;
+              background:${bandStyle.color};
+              border:2px solid #05040E;
+              box-shadow:0 0 10px ${bandStyle.glow};
+            "></span>
+            ${
+              showInlineChip
+                ? `<div style="
+              position:absolute;
+              left:0;
+              top:0;
+              transform:translate(${translateX}, ${translateY});
+              padding:2px 7px;
+              border-radius:6px;
+              background:rgba(10,8,24,0.92);
+              border:1px solid rgba(192,132,252,0.28);
+              color:#F1F5F9;
+              font-family:'Inter',sans-serif;
+              font-size:10.5px;
+              font-weight:500;
+              white-space:nowrap;
+              box-shadow:0 4px 12px rgba(0,0,0,0.72);
+            ">
+              ${place.business_name}
+            </div>`
+                : ''
+            }
+          </div>`,
+          iconSize: [dotSize, dotSize],
+          iconAnchor: [0, 0],
+        });
 
-      const secondaryCandidateIcon = L.divIcon({
-        className: 'locus-map-clean-icon',
-        html: `<div style="
-          display:inline-flex;
-          align-items:center;
-          gap:6px;
-          padding:3.5px 9px;
-          border-radius:999px;
-          background:rgba(12,19,26,0.94);
-          border:1px solid rgba(111,175,155,0.45);
-          color:#CBD5E1;
-          font-family:'JetBrains Mono',monospace;
-          font-size:9px;
-          white-space:nowrap;
-          cursor:pointer;
-          transform:translate(-50%, 10px);
-          box-shadow:0 6px 16px rgba(0,0,0,0.7);
-        ">
-          <span style="width:7px;height:7px;border-radius:999px;border:1.5px solid #6FAF9B;background:#0A1016;"></span>
-          <span>CANDIDATE // ${cand.label}</span>
-        </div>`,
-        iconSize: [160, 24],
-        iconAnchor: [0, 0],
+        const marker = L.marker([place.latitude, place.longitude], {
+          icon: competitorIcon,
+          zIndexOffset: place.spatial_band === '0-300m' ? 400 : 200,
+        });
+
+        const entitySummary: HoveredMapEntity = {
+          id: place.place_id,
+          name: place.business_name,
+          subLabel: place.vicinity || 'Mapped Competitor',
+          bandLabel: bandStyle.badgeLabel,
+          distanceLabel: `${place.distance_m}m`,
+          sourceLabel: `${place.source} · DATABASE`,
+        };
+
+        marker.on('mouseover', () => setHoveredEntity(entitySummary));
+        marker.on('click', () => setHoveredEntity(entitySummary));
+        marker.on('mouseout', () =>
+          setHoveredEntity((prev) =>
+            prev?.id === place.place_id ? null : prev
+          )
+        );
+        marker.addTo(group);
       });
+    } else if (isResolved && analysis.surroundingNodes.length > 0) {
+      // 4B. Fallback to static anchor nodes if baseline request hasn't completed yet
+      analysis.surroundingNodes.forEach((poi) => {
+        const color = POI_CATEGORY_COLOR[poi.category];
+        const poiIcon = L.divIcon({
+          className: 'locus-map-clean-icon',
+          html: `<div style="position:relative;width:9px;height:9px;">
+            <span style="
+              position:absolute;
+              left:-4.5px;
+              top:-4.5px;
+              width:9px;
+              height:9px;
+              border-radius:999px;
+              background:${color};
+              border:2px solid #05040E;
+              box-shadow:0 0 8px ${color};
+            "></span>
+          </div>`,
+          iconSize: [9, 9],
+          iconAnchor: [0, 0],
+        });
 
-      const candMarker = L.marker([cand.lat, cand.lng], {
-        icon: secondaryCandidateIcon,
+        const marker = L.marker([poi.lat, poi.lng], { icon: poiIcon });
+        marker.on('mouseover', () =>
+          setHoveredEntity({
+            id: poi.id,
+            name: poi.name,
+            subLabel: poi.subLabel,
+            bandLabel: poi.distanceBand,
+          })
+        );
+        marker.on('mouseout', () =>
+          setHoveredEntity((prev) => (prev?.id === poi.id ? null : prev))
+        );
+        marker.addTo(group);
       });
-      candMarker.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
-        onSelectCandidate(cand.id);
-      });
-      candMarker.addTo(group);
-    });
+    }
 
-    // 6. Active Candidate Location Marker (Primary Spatial Core Beacon)
-    const activeTitle = customPinCoords
-      ? 'Placed Candidate Pin'
-      : selectedCandidate.label;
+    // 5. Primary Draggable Candidate Location Marker (Luminous Indigo/Violet + Warm Orange Core)
+    const pinLabel = isResolved
+      ? analysis.candidateName
+      : 'Click map or drag pin to select location';
 
     const primaryCandidateIcon = L.divIcon({
       className: 'locus-map-clean-icon',
-      html: `<div style="
+      html: `<div data-testid="candidate-map-pin" style="
         position:relative;
         display:flex;
         flex-direction:column;
         align-items:center;
         transform:translate(-50%, -50%);
-        pointer-events:auto;
+        cursor:grab;
       ">
         <div style="
-          width:18px;
-          height:18px;
+          width:24px;
+          height:24px;
           border-radius:999px;
-          background:rgba(111,175,155,0.32);
-          border:2.5px solid #6FAF9B;
-          box-shadow:0 0 22px rgba(111,175,155,0.95);
-        "></div>
-        <div style="
-          margin-top:6px;
-          padding:4px 10px;
-          border-radius:999px;
-          background:rgba(8,12,18,0.96);
-          border:1.5px solid #6FAF9B;
-          color:#F8FAFC;
-          font-family:'JetBrains Mono',monospace;
-          font-size:9.5px;
-          font-weight:700;
-          letter-spacing:0.08em;
-          white-space:nowrap;
-          box-shadow:0 10px 28px rgba(0,0,0,0.85), 0 0 16px rgba(111,175,155,0.3);
+          background:linear-gradient(135deg, rgba(124,58,237,0.55) 0%, rgba(249,115,22,0.55) 100%);
+          border:2.5px solid #FB923C;
+          box-shadow:0 0 24px rgba(249,115,22,0.88), 0 0 40px rgba(139,92,246,0.65), inset 0 1px 1px rgba(255,255,255,0.55);
           display:flex;
           align-items:center;
-          gap:6px;
+          justify-content:center;
         ">
-          <span style="width:6px;height:6px;border-radius:999px;background:#6FAF9B;box-shadow:0 0 8px #6FAF9B;"></span>
-          <span>CANDIDATE // ${activeTitle}</span>
+          <span style="width:7px;height:7px;border-radius:999px;background:#FFFFFF;"></span>
+        </div>
+        <div style="
+          margin-top:8px;
+          padding:5px 13px;
+          border-radius:999px;
+          background:linear-gradient(145deg, rgba(16,12,34,0.92) 0%, rgba(8,6,20,0.88) 100%);
+          backdrop-filter:blur(16px);
+          border-top:1px solid rgba(216,180,254,0.45);
+          border-left:1px solid rgba(129,140,248,0.42);
+          border-right:1px solid rgba(251,146,60,0.35);
+          border-bottom:1px solid rgba(251,146,60,0.28);
+          color:#F8FAFC;
+          font-family:'Plus Jakarta Sans','Inter',sans-serif;
+          font-size:12px;
+          font-weight:600;
+          white-space:nowrap;
+          box-shadow:0 14px 28px rgba(0,0,0,0.82), inset 0 1px 0 rgba(255,255,255,0.20);
+          display:flex;
+          align-items:center;
+          gap:7px;
+        ">
+          <span style="width:6px;height:6px;border-radius:999px;background:linear-gradient(135deg,#E879F9,#FB923C);"></span>
+          <span>${pinLabel}</span>
         </div>
       </div>`,
-      iconSize: [220, 56],
+      iconSize: [260, 64],
       iconAnchor: [0, 0],
     });
 
-    L.marker([activeLat, activeLng], {
+    const candidateMarker = L.marker([activeLat, activeLng], {
       icon: primaryCandidateIcon,
+      draggable: true,
       zIndexOffset: 1000,
-    }).addTo(group);
+    });
+
+    candidateMarker.on('dragend', () => {
+      const pos = candidateMarker.getLatLng();
+      onUpdateCoordinates({
+        lat: Number(pos.lat.toFixed(5)),
+        lng: Number(pos.lng.toFixed(5)),
+      });
+    });
+
+    candidateMarker.addTo(group);
   }, [
-    localArea,
-    selectedCandidate,
-    customPinCoords,
+    analysis,
     activeLat,
     activeLng,
-    onSelectCandidate,
+    baselinePlaces,
+    isResolved,
+    onUpdateCoordinates,
   ]);
 
+  const topTitle = isResolved
+    ? [analysis.localArea, analysis.city, analysis.state]
+        .filter(Boolean)
+        .join(', ') || analysis.candidateName
+    : 'Choose where you want to investigate';
+
   return (
-    <div className="relative h-full min-h-[560px] w-full overflow-hidden rounded-2xl border border-white/15 bg-[#080C12] shadow-[0_24px_60px_-15px_rgba(0,0,0,0.85)]">
-      {/* Subtle Spatial Coordinate Grid Behind Leaflet Tiles */}
+    <div className="relative h-full min-h-[540px] w-full overflow-hidden rounded-3xl border-t border-l border-r border-b border-t-[#D8B4FE]/30 border-l-[#818CF8]/25 border-r-[#FB923C]/18 border-b-[#FB923C]/14 bg-[#05040E]/90 shadow-[0_32px_72px_-18px_rgba(2,1,8,0.92)] xl:min-h-[640px]">
+      {/* Subtle Spatial Grid Behind Map Tiles */}
       <div
         className="pointer-events-none absolute inset-0 z-0"
         style={{
           backgroundImage:
-            'linear-gradient(to right, rgba(111, 175, 155, 0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(111, 175, 155, 0.06) 1px, transparent 1px)',
-          backgroundSize: '44px 44px',
-          opacity: tilesReady ? 0.35 : 0.75,
+            'linear-gradient(to right, rgba(168, 85, 247, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(129, 140, 248, 0.05) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+          opacity: tilesReady ? 0.25 : 0.65,
         }}
         aria-hidden="true"
       />
 
-      {/* Leaflet Interactive Map Canvas */}
+      {/* Leaflet Map Surface (Physical Spatial Surface — Never Blurred) */}
       <div
         ref={mapContainerRef}
-        aria-label="LOCUS Local Area & Candidate Location Spatial Map"
-        className="relative z-10 h-full min-h-[560px] w-full"
+        data-testid="locus-discovery-map"
+        aria-label="LOCUS Candidate Location Spatial Map"
+        className="relative z-10 h-full min-h-[540px] w-full cursor-crosshair xl:min-h-[640px]"
       />
 
-      {/* UNIFIED TOP MAP HUD BAR: Never overlaps across 1920x1080, 1440x900, or 1366x768 */}
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex flex-wrap items-center justify-between gap-2">
-        {/* Top-Left: Local-First Geographic Hierarchy Pill */}
-        <div className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-[#0A1016]/90 px-3 py-1.5 shadow-lg backdrop-blur-md">
-          <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-slate-400">
-            {city.name}
+      {/* Minimal Top Overlay: Active Place Title on Left, Spatial Scope Zoom on Right */}
+      <div className="pointer-events-none absolute inset-x-4 top-3.5 z-20 flex flex-wrap items-center justify-between gap-2">
+        <div className="liquid-glass-control inline-flex items-center gap-2.5 rounded-2xl px-3.5 py-1.5">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              isResolved
+                ? 'bg-gradient-to-tr from-[#E879F9] to-[#FB923C] shadow-[0_0_8px_rgba(249,115,22,0.85)]'
+                : 'bg-slate-400'
+            }`}
+          />
+          <span className="text-xs font-medium text-slate-100 sm:text-sm">
+            {topTitle}
           </span>
-          <span className="font-mono text-[9.5px] text-[#6FAF9B]">→</span>
-          <span className="rounded bg-[#3D806D]/30 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#6FAF9B]">
-            {localArea.name}
-          </span>
+          {isResolved && analysis.marketBaseline && (
+            <span className="rounded-md bg-white/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-[#FDBA74]">
+              {analysis.marketBaseline.total_mapped} mapped
+            </span>
+          )}
         </div>
 
-        {/* Top-Right: Spatial Ring Camera Scope Selector */}
-        <div className="pointer-events-auto inline-flex items-center gap-1 rounded-xl border border-white/15 bg-[#0A1016]/90 p-1 shadow-lg backdrop-blur-md">
+        {/* Spatial Catchment Scope Control */}
+        <div className="liquid-glass-control pointer-events-auto inline-flex items-center gap-1 rounded-2xl p-1">
           {(
             [
-              { id: 'ground', label: '0–300m', sub: 'Ground' },
-              { id: 'local', label: '300m–2km', sub: 'Local' },
-              { id: 'wider', label: '2–5km', sub: 'Wider' },
+              { id: 'ground', label: '0–300m', title: 'Ground Reality' },
+              { id: 'local', label: '300m–2km', title: 'Local Market' },
+              { id: 'wider', label: '2–5km', title: 'Wider Market' },
             ] as const
           ).map((scope) => {
             const isCurrent = activeScope === scope.id;
@@ -462,58 +494,75 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
                 key={scope.id}
                 type="button"
                 onClick={() => setActiveScope(scope.id)}
-                className={`rounded-lg px-2 py-1 font-mono text-[9.5px] uppercase tracking-[0.11em] transition-all ${
+                title={scope.title}
+                className={`rounded-xl px-2.5 py-1 text-xs transition-all ${
                   isCurrent
-                    ? 'border border-[#6FAF9B]/55 bg-[#3D806D]/35 font-bold text-white'
+                    ? 'bg-gradient-to-r from-[#4F46E5]/55 via-[#9333EA]/45 to-[#F97316]/40 font-medium text-white ring-1 ring-[#C084FC]/55'
                     : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
                 }`}
               >
-                <span>{scope.label}</span>
-                <span className="ml-1 hidden text-[8.5px] text-[#6FAF9B] xl:inline">
-                  {scope.sub}
-                </span>
+                <span className="font-mono text-[11px]">{scope.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Hovered Baseline POI Tooltip Banner */}
-      {hoveredPoi && (
-        <div className="pointer-events-none absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-xl border border-sky-400/40 bg-[#0A1016]/95 px-3.5 py-2 shadow-xl backdrop-blur-md">
-          <div className="flex items-center gap-2 font-mono text-[10px]">
-            <span className="rounded border border-sky-400/40 bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold text-sky-300">
-              {hoveredPoi.evidenceType}
-            </span>
-            <span className="font-semibold text-white">{hoveredPoi.name}</span>
-            <span className="text-slate-400">·</span>
-            <span className="text-slate-300">{hoveredPoi.subLabel}</span>
-            <span className="text-slate-400">·</span>
-            <span className="text-[#6FAF9B]">{hoveredPoi.distanceBand}</span>
-          </div>
+      {/* Bottom-Right Map Legend: Visually distinguishes Candidate Pin vs Competitor Spatial Bands */}
+      {isResolved && (
+        <div
+          data-testid="map-spatial-legend"
+          className="liquid-glass-control pointer-events-none absolute bottom-3.5 right-3.5 z-20 hidden items-center gap-3 rounded-2xl px-3 py-1.5 text-[11px] text-slate-300 sm:flex"
+        >
+          <span className="inline-flex items-center gap-1.5 font-medium text-white">
+            <span className="h-2.5 w-2.5 rounded-full border border-[#FB923C] bg-gradient-to-tr from-[#7C3AED] to-[#F97316]" />
+            <span>Candidate</span>
+          </span>
+          <span className="h-3 w-px bg-white/10" />
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#FB923C]" />
+            <span className="font-mono text-[10px]">0–300m</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#818CF8]" />
+            <span className="font-mono text-[10px]">300m–2km</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#E879F9]" />
+            <span className="font-mono text-[10px]">2–5km</span>
+          </span>
         </div>
       )}
 
-      {/* BOTTOM MAP LEGEND: 3 LOCUS Spatial Scales + Evidence Context */}
-      <div className="pointer-events-none absolute bottom-3.5 right-3.5 z-20 flex flex-wrap items-center gap-2.5 rounded-xl border border-white/15 bg-[#0A1016]/90 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-slate-300 shadow-lg backdrop-blur-md">
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-[#6FAF9B]" />
-          <span className="font-semibold text-white">0–300m</span>
-          <span className="text-slate-400">Ground Reality</span>
+      {/* Hovered Competitor / Entity Inspection Pill */}
+      {hoveredEntity && (
+        <div
+          data-testid="hovered-map-entity"
+          className="liquid-glass-control pointer-events-none absolute bottom-12 left-1/2 z-20 -translate-x-1/2 rounded-2xl px-3.5 py-2 text-xs text-slate-200"
+        >
+          <span className="font-semibold text-white">{hoveredEntity.name}</span>
+          {hoveredEntity.distanceLabel && (
+            <>
+              <span className="mx-1.5 text-slate-500">·</span>
+              <span className="font-mono text-[11px] text-[#FB923C]">
+                {hoveredEntity.distanceLabel}
+              </span>
+            </>
+          )}
+          <span className="mx-1.5 text-slate-500">·</span>
+          <span className="font-mono text-[11px] text-[#C084FC]">
+            {hoveredEntity.bandLabel}
+          </span>
+          {hoveredEntity.sourceLabel && (
+            <>
+              <span className="mx-1.5 text-slate-500">·</span>
+              <span className="font-mono text-[10px] text-[#818CF8]">
+                {hoveredEntity.sourceLabel}
+              </span>
+            </>
+          )}
         </div>
-        <span className="text-white/15">|</span>
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-sky-400" />
-          <span className="font-semibold text-white">300m–2km</span>
-          <span className="text-slate-400">Local Market</span>
-        </div>
-        <span className="text-white/15">|</span>
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-slate-400" />
-          <span className="font-semibold text-white">2–5km</span>
-          <span className="text-slate-400">Wider Market</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
