@@ -12,5 +12,11 @@
     "noEmit": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "server/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "server/**/*.ts",
+    "src/types/**/*.ts",
+    "src/data/marketDiscoveryData.ts",
+    "src/utils/locationIntelligenceEngine.ts"
+  ]
 }

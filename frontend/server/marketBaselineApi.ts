@@ -204,6 +204,42 @@ const BUSINESS_TYPE_MAP: Record<string, BusinessTypeMapping> = {
       { name: 'Natural Ice Cream', subCategory: 'Fruit Ice Cream Parlor' },
     ],
   },
+  salon: {
+    key: 'salon',
+    displayLabel: 'Salon & Grooming Lounge',
+    pluralLabel: 'salons & grooming lounges',
+    googleIncludedTypes: ['beauty_salon', 'hair_care'],
+    googleLegacyType: 'beauty_salon',
+    googleKeyword: 'salon grooming beauty studio',
+    demoBrandPool: [
+      { name: 'Toni & Guy Hairdressing', subCategory: 'Premium Hair & Styling' },
+      { name: 'Lakmé Salon', subCategory: 'Beauty & Skin Studio' },
+      { name: 'Enrich Beauty Lounge', subCategory: 'Full-Service Salon' },
+      { name: 'Truefitt & Hill', subCategory: 'Luxury Grooming Club' },
+      { name: 'Geetanjali Studio', subCategory: 'Contemporary Hair & Care' },
+      { name: 'Looks Unisex Salon', subCategory: 'High-street Styling Lounge' },
+      { name: 'BBlunt Mini Studio', subCategory: 'Urban Hair Design' },
+      { name: 'Bodycraft Clinic & Salon', subCategory: 'Wellness & Aesthetics' },
+    ],
+  },
+  pharmacy: {
+    key: 'pharmacy',
+    displayLabel: 'Pharmacy & Diagnostics',
+    pluralLabel: 'pharmacies & diagnostic nodes',
+    googleIncludedTypes: ['pharmacy', 'drugstore'],
+    googleLegacyType: 'pharmacy',
+    googleKeyword: 'pharmacy chemist diagnostic',
+    demoBrandPool: [
+      { name: 'Apollo Pharmacy 24/7', subCategory: 'Retail Pharmacy & Wellness' },
+      { name: 'MedPlus Health Mart', subCategory: 'Neighborhood Chemist' },
+      { name: 'Wellness Forever', subCategory: '24x7 Lifestyle Pharmacy' },
+      { name: 'Netmeds Offline Store', subCategory: 'Omnichannel Pharmacy Node' },
+      { name: 'Frank Ross Pharmacy', subCategory: 'Clinical & Retail Chemist' },
+      { name: 'Vijaya Diagnostic Center', subCategory: 'Pathology & Imaging Hub' },
+      { name: 'Dr. Lal PathLabs Node', subCategory: 'Sample Collection & Lab' },
+      { name: ' Guardian Pharmacy', subCategory: 'Health & Personal Care' },
+    ],
+  },
 };
 
 export function resolveBusinessTypeMapping(rawType: string): BusinessTypeMapping {
@@ -213,6 +249,12 @@ export function resolveBusinessTypeMapping(rawType: string): BusinessTypeMapping
   }
   if (norm.includes('retail') || norm.includes('store')) {
     return BUSINESS_TYPE_MAP.retail;
+  }
+  if (norm.includes('salon') || norm.includes('groom') || norm.includes('beauty')) {
+    return BUSINESS_TYPE_MAP.salon;
+  }
+  if (norm.includes('pharm') || norm.includes('chemist') || norm.includes('diagnostic')) {
+    return BUSINESS_TYPE_MAP.pharmacy;
   }
   if (norm.includes('fitness') || norm.includes('gym') || norm.includes('wellness')) {
     return BUSINESS_TYPE_MAP.fitness;

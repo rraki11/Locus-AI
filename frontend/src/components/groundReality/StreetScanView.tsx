@@ -1,0 +1,1205 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  FileVideo,
+  Layers,
+  Sparkles,
+  Upload,
+} from 'lucide-react';
+import { WorkspaceSplineAmbient } from '../discovery/WorkspaceSplineAmbient';
+import {
+  EvidenceType,
+  GroundRealityHandoffPayload,
+  ReconciledFusionItem,
+  ReconciliationStatus,
+  StreetScanFusionResponse,
+  StreetScanPipelineStage,
+} from '../../types/streetScan';
+import {
+  prewarmStreetScanModels,
+  runCalibratedDemoStreetScan,
+  runLiveVideoStreetScan,
+  SampledFramePreview,
+} from '../../utils/streetScanPipeline';
+
+export interface StreetScanViewProps {
+  handoff: GroundRealityHandoffPayload;
+  preferFallback?: boolean;
+  onBackToMarketDiscovery: () => void;
+  onContinueToIntelligence?: (
+    fusionResult: StreetScanFusionResponse | null
+  ) => void;
+}
+
+const PROGRESS_STEPS = [
+  { code: '01', label: 'Market Discovery', active: false },
+  { code: '02', label: 'Ground Reality', active: true },
+  { code: '03', label: 'Intelligence', active: false },
+  { code: '04', label: 'Decision', active: false },
+] as const;
+
+const PIPELINE_STEPS: {
+  stage: StreetScanPipelineStage;
+  label: string;
+  subLabel: string;
+}[] = [
+  {
+    stage: 'UPLOADING',
+    label: 'Uploading',
+    subLabel: 'Validating MP4/MOV video stream',
+  },
+  {
+    stage: 'EXTRACTING_FRAMES',
+    label: 'Extracting frames',
+    subLabel: '~1 FPS downscaled keyframe sampling',
+  },
+  {
+    stage: 'DETECTING_OBJECTS',
+    label: 'Detecting objects',
+    subLabel: 'COCO object detection (person, vehicles, seating)',
+  },
+  {
+    stage: 'READING_SIGNS',
+    label: 'Reading signs',
+    subLabel: 'Selective OCR on top 5–8 sharpest keyframes',
+  },
+  {
+    stage: 'DEDUPLICATING',
+    label: 'Deduplicating',
+    subLabel: 'Temporal multi-frame storefront consolidation',
+  },
+  {
+    stage: 'FUSING_EVIDENCE',
+    label: 'Fusing evidence',
+    subLabel: '0–300m DATABASE baseline vs OBSERVED scan',
+  },
+];
+
+const STAGE_ORDER: Record<StreetScanPipelineStage, number> = {
+  IDLE: 0,
+  UPLOADING: 1,
+  EXTRACTING_FRAMES: 2,
+  DETECTING_OBJECTS: 3,
+  READING_SIGNS: 4,
+  DEDUPLICATING: 5,
+  FUSING_EVIDENCE: 6,
+  COMPLETE: 7,
+  ERROR: -1,
+};
+
+const EVIDENCE_BADGE_STYLE: Record<
+  EvidenceType,
+  { bg: string; dot: string; label: string }
+> = {
+  OBSERVED: {
+    bg: 'border-emerald-400/45 bg-emerald-500/15 text-emerald-200',
+    dot: 'bg-emerald-400',
+    label: 'OBSERVED',
+  },
+  DATABASE: {
+    bg: 'border-[#818CF8]/45 bg-[#4F46E5]/20 text-[#C7D2FE]',
+    dot: 'bg-[#818CF8]',
+    label: 'DATABASE',
+  },
+  INFERRED: {
+    bg: 'border-[#FB923C]/50 bg-[#F97316]/20 text-[#FED7AA]',
+    dot: 'bg-[#FB923C]',
+    label: 'INFERRED',
+  },
+  PREDICTED_ANALYTICAL: {
+    bg: 'border-[#E879F9]/45 bg-[#A855F7]/20 text-[#F5D0FE]',
+    dot: 'bg-[#E879F9]',
+    label: 'PREDICTED_ANALYTICAL',
+  },
+};
+
+type LedgerFilter = 'ALL' | ReconciliationStatus | EvidenceType;
+
+export const StreetScanView: React.FC<StreetScanViewProps> = ({
+  handoff,
+  preferFallback = false,
+  onBackToMarketDiscovery,
+  onContinueToIntelligence,
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [pipelineStage, setPipelineStage] =
+    useState<StreetScanPipelineStage>('IDLE');
+  const [statusMessage, setStatusMessage] = useState<string>(
+    'Upload a 30–60s street clip (MP4/MOV) or run the calibrated demo scan.'
+  );
+  const [progressPct, setProgressPct] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
+  const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
+
+  const [fusionResult, setFusionResult] =
+    useState<StreetScanFusionResponse | null>(null);
+  const [framePreviews, setFramePreviews] = useState<SampledFramePreview[]>([]);
+  const [selectedFrameIndex, setSelectedFrameIndex] = useState<number>(1);
+  const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('ALL');
+
+  // Prewarm COCO-SSD model asynchronously when entering View 2
+  useEffect(() => {
+    prewarmStreetScanModels();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (uploadedVideoUrl) {
+        URL.revokeObjectURL(uploadedVideoUrl);
+      }
+    };
+  }, [uploadedVideoUrl]);
+
+  const lastScannedCoordRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  // If the user returns to View 1 and selects a different candidate location (>50m away),
+  // clear any Street Scan from the previous corridor so observations are never misattributed.
+  useEffect(() => {
+    const prev = lastScannedCoordRef.current;
+    const lat = handoff?.coordinates?.lat;
+    const lng = handoff?.coordinates?.lng;
+    if (
+      prev &&
+      typeof lat === 'number' &&
+      typeof lng === 'number' &&
+      (Math.abs(prev.lat - lat) > 0.0005 ||
+        Math.abs(prev.lng - lng) > 0.0005)
+    ) {
+      setFusionResult(null);
+      setFramePreviews([]);
+      setPipelineStage('IDLE');
+      setErrorMessage(null);
+      setStatusMessage(
+        'Candidate location changed. Upload a 30–60s street clip (MP4/MOV) or run the calibrated demo scan for this corridor.'
+      );
+      lastScannedCoordRef.current = null;
+    }
+  }, [handoff?.coordinates?.lat, handoff?.coordinates?.lng]);
+
+  const baseline300m = useMemo(
+    () => handoff?.marketBaseline?.bands?.['0-300m']?.places ?? [],
+    [handoff?.marketBaseline]
+  );
+
+  const baselineLocal = useMemo(
+    () => handoff?.marketBaseline?.bands?.['300m-2km']?.places ?? [],
+    [handoff?.marketBaseline]
+  );
+
+  const candidateMeta = useMemo(
+    () => ({
+      latitude: handoff?.coordinates?.lat ?? 12.9352,
+      longitude: handoff?.coordinates?.lng ?? 77.6245,
+      state: handoff?.state ?? '',
+      city: handoff?.city ?? '',
+      local_area: handoff?.localArea ?? '',
+      label: handoff?.candidateName ?? 'Candidate Corridor',
+    }),
+    [handoff]
+  );
+
+  const handleVideoFileSelected = useCallback(
+    async (file: File) => {
+      // Clear any prior Calibrated Demo or previous scan state immediately so demo telemetry never contaminates live upload
+      setErrorMessage(null);
+      setFusionResult(null);
+      setFramePreviews([]);
+      if (uploadedVideoUrl) {
+        URL.revokeObjectURL(uploadedVideoUrl);
+      }
+      const nextPreviewUrl = URL.createObjectURL(file);
+      setUploadedVideoUrl(nextPreviewUrl);
+      setUploadedFilename(file.name);
+
+      try {
+        const { fusionResponse, framePreviews: nextFrames } =
+          await runLiveVideoStreetScan({
+            file,
+            candidate: candidateMeta,
+            businessType: handoff?.profile?.businessType || 'Café',
+            baselinePlaces300m: baseline300m,
+            baselinePlacesLocal: baselineLocal,
+            onProgress: (upd) => {
+              setPipelineStage(upd.stage);
+              setStatusMessage(upd.statusText);
+              setProgressPct(upd.progressPct);
+            },
+          });
+
+        lastScannedCoordRef.current = {
+          lat: candidateMeta.latitude,
+          lng: candidateMeta.longitude,
+        };
+        setFusionResult(fusionResponse);
+        setFramePreviews(nextFrames);
+        const firstOcrFrame = nextFrames.find((f) => f.ocr_sampled);
+        setSelectedFrameIndex(firstOcrFrame?.frame_index ?? 1);
+      } catch (err: any) {
+        setFusionResult(null);
+        setFramePreviews([]);
+        setPipelineStage('ERROR');
+        setErrorMessage(
+          err?.message ||
+            'Could not process video file. You can retry with another MP4/MOV or run the explicitly labeled Calibrated Demo Scan.'
+        );
+      }
+    },
+    [
+      uploadedVideoUrl,
+      candidateMeta,
+      handoff?.profile?.businessType,
+      baseline300m,
+      baselineLocal,
+    ]
+  );
+
+  const handleRunCalibratedDemo = useCallback(async () => {
+    setErrorMessage(null);
+    if (uploadedVideoUrl) {
+      URL.revokeObjectURL(uploadedVideoUrl);
+      setUploadedVideoUrl(null);
+    }
+    setUploadedFilename(null);
+
+    try {
+      const { fusionResponse, framePreviews: nextFrames } =
+        await runCalibratedDemoStreetScan({
+          candidate: candidateMeta,
+          businessType: handoff?.profile?.businessType || 'Café',
+          baselinePlaces300m: baseline300m,
+          baselinePlacesLocal: baselineLocal,
+          onProgress: (upd) => {
+            setPipelineStage(upd.stage);
+            setStatusMessage(upd.statusText);
+            setProgressPct(upd.progressPct);
+          },
+        });
+
+      lastScannedCoordRef.current = {
+        lat: candidateMeta.latitude,
+        lng: candidateMeta.longitude,
+      };
+      setFusionResult(fusionResponse);
+      setFramePreviews(nextFrames);
+      const firstOcrFrame = nextFrames.find((f) => f.ocr_sampled);
+      setSelectedFrameIndex(firstOcrFrame?.frame_index ?? 1);
+    } catch (err: any) {
+      setPipelineStage('ERROR');
+      setErrorMessage(
+        err?.message || 'Failed to run calibrated demo street scan.'
+      );
+    }
+  }, [
+    uploadedVideoUrl,
+    candidateMeta,
+    handoff?.profile?.businessType,
+    baseline300m,
+    baselineLocal,
+  ]);
+
+  const activeFramePreview = useMemo(
+    () =>
+      framePreviews.find((f) => f.frame_index === selectedFrameIndex) ||
+      framePreviews[0] ||
+      null,
+    [framePreviews, selectedFrameIndex]
+  );
+
+  const filteredLedger: ReconciledFusionItem[] = useMemo(() => {
+    if (!fusionResult) return [];
+    return fusionResult.reconciled_ledger.filter((item) => {
+      if (ledgerFilter === 'ALL') return true;
+      if (
+        ledgerFilter === 'MATCHED' ||
+        ledgerFilter === 'ADDITIONAL_SIGNAL' ||
+        ledgerFilter === 'BASELINE_ONLY'
+      ) {
+        return item.reconciliation_status === ledgerFilter;
+      }
+      return item.evidence_type === ledgerFilter;
+    });
+  }, [fusionResult, ledgerFilter]);
+
+  const isRunning =
+    pipelineStage !== 'IDLE' &&
+    pipelineStage !== 'COMPLETE' &&
+    pipelineStage !== 'ERROR';
+
+  const currentStageRank = STAGE_ORDER[pipelineStage] ?? 0;
+
+  return (
+    <section
+      aria-label="Page 3 — View 2: Street Scan and Ground Truth Fusion"
+      className="relative min-h-screen w-full overflow-hidden bg-[#03020A] text-[#F8FAFC]"
+    >
+      {/* Shared Ambient Looping Intelligence Field */}
+      <WorkspaceSplineAmbient entryProgress={1} preferFallback={preferFallback} />
+
+      {/* TOP BAR */}
+      <header className="relative z-30 border-b border-white/[0.10] bg-[#050312]/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-6 py-2.5 sm:px-10">
+          <div className="flex items-center gap-3.5">
+            <div className="flex items-center gap-2">
+              <span
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#4F46E5] via-[#E879F9] to-[#F97316] shadow-[0_0_10px_rgba(249,115,22,0.85)]"
+                aria-hidden="true"
+              />
+              <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
+                LOCUS AI
+              </span>
+            </div>
+            <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
+            <span className="bg-gradient-to-r from-[#A5B4FC] via-[#E879F9] to-[#FB923C] bg-clip-text text-xs font-semibold text-transparent">
+              02 / Ground Reality — Street Scan &amp; Ground Truth Fusion
+            </span>
+          </div>
+
+          {/* 4-View Workspace Sequence */}
+          <nav
+            aria-label="LOCUS Workspace Views"
+            className="flex flex-wrap items-center gap-3"
+          >
+            {PROGRESS_STEPS.map((step, index) => (
+              <React.Fragment key={step.code}>
+                <button
+                  type="button"
+                  disabled={step.code === '04'}
+                  onClick={() => {
+                    if (step.code === '01') {
+                      onBackToMarketDiscovery();
+                    }
+                    if (step.code === '03') {
+                      onContinueToIntelligence?.(fusionResult);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 text-xs transition-colors ${
+                    step.active
+                      ? 'font-semibold text-white'
+                      : step.code === '01' || step.code === '03'
+                      ? 'cursor-pointer text-slate-300 hover:text-white'
+                      : 'cursor-default text-slate-500'
+                  }`}
+                >
+                  <span
+                    className={`font-mono text-[11px] ${
+                      step.active ? 'text-[#FB923C]' : 'text-slate-500'
+                    }`}
+                  >
+                    {step.code}
+                  </span>
+                  <span>{step.label}</span>
+                </button>
+                {index < PROGRESS_STEPS.length - 1 && (
+                  <span className="text-xs text-slate-600" aria-hidden="true">
+                    →
+                  </span>
+                )}
+              </React.Fragment>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2.5">
+            {fusionResult && (
+              <span
+                data-testid="street-scan-mode-pill"
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold ${
+                  fusionResult.scan_mode === 'LIVE_UPLOAD'
+                    ? 'border-emerald-400/45 bg-emerald-500/15 text-emerald-200'
+                    : 'border-amber-400/45 bg-amber-500/15 text-amber-200'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    fusionResult.scan_mode === 'LIVE_UPLOAD'
+                      ? 'bg-emerald-400'
+                      : 'bg-amber-400'
+                  }`}
+                />
+                <span>
+                  {fusionResult.scan_mode === 'LIVE_UPLOAD'
+                    ? 'LIVE VIDEO · COCO + OCR'
+                    : 'CALIBRATED DEMO · LABELED FALLBACK'}
+                </span>
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={onBackToMarketDiscovery}
+              data-testid="back-to-market-discovery"
+              className="liquid-glass-control inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-medium text-slate-200 transition-colors hover:border-[#C084FC]/50 hover:text-white"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-[#E879F9]" />
+              <span>01 / Market Discovery</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN 3-COLUMN WORKSPACE */}
+      <div className="relative z-10 mx-auto max-w-[1680px] px-6 py-4 sm:px-10 xl:py-6">
+        <div className="grid grid-cols-1 gap-5 xl:gap-6 lg:grid-cols-[minmax(300px,27%)_minmax(0,38%)_minmax(320px,35%)] lg:items-stretch">
+          {/* LEFT PANEL: STREET SCAN UPLOAD + VIDEO PREVIEW + PIPELINE STATUS */}
+          <aside
+            aria-label="Street Scan Upload and Pipeline Status"
+            className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5"
+          >
+            <div className="space-y-4">
+              {/* Candidate Scope Context */}
+              <div className="flex items-start justify-between gap-2 border-b border-white/[0.08] pb-3">
+                <div>
+                  <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#FB923C]">
+                    STREET SCAN · 0–300m GROUND REALITY
+                  </span>
+                  <h2 className="mt-0.5 font-display text-base font-semibold text-white xl:text-lg">
+                    {handoff?.localArea || handoff?.candidateName || 'Candidate Corridor'}
+                  </h2>
+                  <p className="text-xs text-slate-300/80">
+                    {[handoff?.city, handoff?.state].filter(Boolean).join(', ')} ·{' '}
+                    <span className="text-[#E879F9]">
+                      {handoff?.profile?.businessType || 'Business'}
+                    </span>
+                  </p>
+                </div>
+                <span className="rounded-xl border border-[#818CF8]/35 bg-[#4F46E5]/15 px-2.5 py-1 font-mono text-[10px] font-semibold text-[#C7D2FE]">
+                  {baseline300m.length} in 0–300m DB
+                </span>
+              </div>
+
+              {/* Upload Video Control */}
+              <div className="space-y-2.5">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+                  data-testid="street-scan-file-input"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      void handleVideoFileSelected(file);
+                    }
+                  }}
+                />
+
+                <div
+                  onClick={() => !isRunning && fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (isRunning) return;
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) {
+                      void handleVideoFileSelected(file);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (
+                      !isRunning &&
+                      (e.key === 'Enter' || e.key === ' ')
+                    ) {
+                      e.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  data-testid="street-scan-upload-dropzone"
+                  className={`group cursor-pointer rounded-2xl border border-dashed p-4 text-center transition-all ${
+                    isRunning
+                      ? 'cursor-wait border-[#818CF8]/40 bg-[#4F46E5]/10'
+                      : 'border-white/20 bg-white/[0.025] hover:border-[#E879F9]/60 hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-[#E879F9]/35 bg-gradient-to-br from-[#4F46E5]/30 via-[#9333EA]/25 to-[#F97316]/25">
+                    <Upload className="h-4 w-4 text-[#FDBA74]" />
+                  </div>
+                  <p className="mt-2 text-xs font-semibold text-white">
+                    {uploadedFilename
+                      ? `Uploaded: ${uploadedFilename}`
+                      : 'Upload Street Video'}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[10.5px] text-slate-400">
+                    Supported: MP4 / MOV · 30–60 sec recommended
+                  </p>
+                </div>
+
+                {/* Explicit Calibrated Demo Trigger */}
+                <button
+                  type="button"
+                  disabled={isRunning}
+                  onClick={() => void handleRunCalibratedDemo()}
+                  data-testid="run-calibrated-demo-button"
+                  className="liquid-glass-control flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:border-[#FB923C]/55 hover:text-white disabled:opacity-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-[#FB923C]" />
+                  <span>
+                    Run Calibrated Demo Scan (Labeled Sample Telemetry)
+                  </span>
+                </button>
+              </div>
+
+              {/* Video / Keyframe Preview Surface */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-300">
+                    {uploadedVideoUrl
+                      ? 'Uploaded Street Footage'
+                      : activeFramePreview
+                      ? `Keyframe #${String(
+                          activeFramePreview.frame_index
+                        ).padStart(2, '0')} (${activeFramePreview.timestamp_sec.toFixed(
+                          1
+                        )}s)`
+                      : 'Video & Keyframe Preview'}
+                  </span>
+                  {activeFramePreview?.ocr_sampled && (
+                    <span className="rounded border border-emerald-400/40 bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold text-emerald-300">
+                      OCR KEYFRAME
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-[#05030F]">
+                  {uploadedVideoUrl ? (
+                    <video
+                      src={uploadedVideoUrl}
+                      controls
+                      playsInline
+                      className="h-full w-full object-contain"
+                    />
+                  ) : activeFramePreview ? (
+                    <img
+                      src={activeFramePreview.preview_data_url}
+                      alt={`Extracted frame ${activeFramePreview.frame_index}`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+                      <FileVideo className="h-7 w-7 text-slate-500" />
+                      <p className="mt-1.5 text-xs text-slate-400">
+                        No street footage loaded yet.
+                      </p>
+                      <p className="mt-0.5 font-mono text-[10px] text-slate-500">
+                        Frames are extracted in-browser at ~1 FPS (640px max width).
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Keyframe Scrubber Pills */}
+                {framePreviews.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5">
+                    {framePreviews.map((fp) => {
+                      const isSelected =
+                        fp.frame_index === activeFramePreview?.frame_index;
+                      return (
+                        <button
+                          key={fp.frame_index}
+                          type="button"
+                          onClick={() => setSelectedFrameIndex(fp.frame_index)}
+                          className={`shrink-0 rounded-lg border px-2 py-1 font-mono text-[10px] transition-all ${
+                            isSelected
+                              ? 'border-[#FB923C] bg-[#F97316]/25 font-semibold text-white'
+                              : fp.ocr_sampled
+                              ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400/60'
+                              : 'border-white/10 bg-white/[0.03] text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          #{String(fp.frame_index).padStart(2, '0')}
+                          {fp.ocr_sampled ? ' · OCR' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 6-Stage Processing Status Checklist */}
+              <div className="border-t border-white/[0.08] pt-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                    Processing Status
+                  </span>
+                  <span className="font-mono text-[10.5px] text-[#FB923C]">
+                    {progressPct}%
+                  </span>
+                </div>
+
+                <div className="mb-2.5 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#4F46E5] via-[#E879F9] to-[#FB923C] transition-all duration-300"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+
+                <div
+                  data-testid="street-scan-pipeline-steps"
+                  className="space-y-1.5"
+                >
+                  {PIPELINE_STEPS.map((step) => {
+                    const stepRank = STAGE_ORDER[step.stage];
+                    const isDone =
+                      pipelineStage === 'COMPLETE' ||
+                      currentStageRank > stepRank;
+                    const isCurrent = pipelineStage === step.stage;
+
+                    return (
+                      <div
+                        key={step.stage}
+                        className={`flex items-center justify-between rounded-xl border px-2.5 py-1.5 text-xs transition-colors ${
+                          isCurrent
+                            ? 'border-[#E879F9]/50 bg-[#9333EA]/15 text-white'
+                            : isDone
+                            ? 'border-emerald-400/25 bg-emerald-500/[0.07] text-slate-200'
+                            : 'border-white/[0.05] bg-white/[0.02] text-slate-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              isCurrent
+                                ? 'animate-pulse bg-[#FB923C]'
+                                : isDone
+                                ? 'bg-emerald-400'
+                                : 'bg-slate-600'
+                            }`}
+                          />
+                          <span className="font-medium">{step.label}</span>
+                        </div>
+                        <span className="font-mono text-[10px] text-slate-400">
+                          {step.subLabel}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-2 font-mono text-[10.5px] text-slate-300">
+                  {statusMessage}
+                </p>
+
+                {errorMessage && (
+                  <div
+                    role="alert"
+                    className="mt-2 flex items-start gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 p-2.5 text-xs text-amber-200"
+                  >
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 border-t border-white/[0.08] pt-2.5 font-mono text-[10px] text-slate-400">
+              Normalized frame observations sent to{' '}
+              <span className="text-slate-200">/api/street-scan/fuse</span> (no
+              raw video buffers transmitted).
+            </div>
+          </aside>
+
+          {/* CENTER PANEL: GROUND REALITY — DETECTION & EVIDENCE VISUALIZATION */}
+          <div className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5">
+            <div className="space-y-4">
+              {/* Header + Scope Honesty Banner */}
+              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-white/[0.08] pb-3">
+                <div>
+                  <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-300">
+                    GROUND REALITY · VISUAL EVIDENCE
+                  </span>
+                  <h2 className="mt-0.5 font-display text-base font-semibold text-white xl:text-lg">
+                    Observed Entities &amp; COCO Activity Signals
+                  </h2>
+                </div>
+                <span
+                  className={`rounded-lg border px-2 py-0.5 font-mono text-[10px] font-semibold ${EVIDENCE_BADGE_STYLE.OBSERVED.bg}`}
+                >
+                  OBSERVED
+                </span>
+              </div>
+
+              {/* Explicit Spatial Honesty Notice */}
+              <div className="rounded-2xl border border-white/[0.09] bg-white/[0.03] px-3.5 py-2.5 text-xs leading-relaxed text-slate-300">
+                <span className="font-semibold text-white">
+                  Spatial Scope (0–300m Ground Reality):{' '}
+                </span>
+                {fusionResult
+                  ? fusionResult.honesty_notice
+                  : 'A 30–60 second street video represents only the physical corridor captured by the camera within 0–300m—never the entire 2–5km market.'}
+              </div>
+
+              {/* Three Primary Ground Reality Counters */}
+              <div
+                data-testid="ground-reality-counters"
+                className="grid grid-cols-3 gap-2.5"
+              >
+                <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/[0.08] p-3">
+                  <span className="block font-mono text-[10px] uppercase tracking-wider text-emerald-300">
+                    Observed entities
+                  </span>
+                  <span
+                    data-testid="count-observed-entities"
+                    className="mt-1 block font-display text-2xl font-bold text-white"
+                  >
+                    {fusionResult ? fusionResult.counts.observed_entities : '—'}
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
+                    Temporally deduplicated
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-[#818CF8]/30 bg-[#4F46E5]/[0.10] p-3">
+                  <span className="block font-mono text-[10px] uppercase tracking-wider text-[#A5B4FC]">
+                    Commercial signals
+                  </span>
+                  <span
+                    data-testid="count-commercial-signals"
+                    className="mt-1 block font-display text-2xl font-bold text-white"
+                  >
+                    {fusionResult
+                      ? fusionResult.counts.observed_commercial_signals
+                      : '—'}
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
+                    Signboards + COCO context
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-[#FB923C]/35 bg-[#F97316]/[0.10] p-3">
+                  <span className="block font-mono text-[10px] uppercase tracking-wider text-[#FDBA74]">
+                    OCR-confirmed names
+                  </span>
+                  <span
+                    data-testid="count-ocr-confirmed"
+                    className="mt-1 block font-display text-2xl font-bold text-white"
+                  >
+                    {fusionResult
+                      ? fusionResult.counts.ocr_confirmed_names
+                      : '—'}
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
+                    Normalized signboard text
+                  </span>
+                </div>
+              </div>
+
+              {/* Temporally Deduplicated OCR Storefront Entities */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">
+                    Temporally Deduplicated Storefront Reads
+                  </h3>
+                  {fusionResult && (
+                    <span className="font-mono text-[10px] text-slate-400">
+                      {fusionResult.video_summary.ocr_keyframes_count} OCR
+                      keyframes / {fusionResult.video_summary.frames_extracted}{' '}
+                      sampled frames
+                    </span>
+                  )}
+                </div>
+
+                {fusionResult &&
+                fusionResult.deduplicated_entities.length > 0 ? (
+                  <div
+                    data-testid="deduplicated-entities-list"
+                    className="max-h-[250px] space-y-2 overflow-y-auto pr-1"
+                  >
+                    {fusionResult.deduplicated_entities.map((entity) => (
+                      <div
+                        key={entity.entity_id}
+                        className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 transition-colors hover:border-emerald-400/35"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-display text-sm font-semibold text-white">
+                                {entity.display_name}
+                              </span>
+                              <span
+                                className={`rounded border px-1.5 py-0.5 font-mono text-[9px] font-semibold ${EVIDENCE_BADGE_STYLE.OBSERVED.bg}`}
+                              >
+                                {entity.evidence_type}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 font-mono text-[10.5px] text-slate-400">
+                              Source: {entity.source} ({entity.detector_label}) ·
+                              Confidence: {Math.round(entity.confidence * 100)}%
+                            </p>
+                          </div>
+
+                          <span className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] text-emerald-300">
+                            Frames #{entity.frame_indices.join(', #')} (
+                            {entity.first_seen_sec}s–{entity.last_seen_sec}s)
+                          </span>
+                        </div>
+
+                        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-1.5 font-mono text-[10px] text-slate-400">
+                          <span>
+                            Normalized:{' '}
+                            <code className="text-slate-200">
+                              "{entity.normalized_name}"
+                            </code>
+                          </span>
+                          <span>{entity.nearby_activity_context}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : fusionResult ? (
+                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 text-xs text-slate-400">
+                    No high-confidence commercial signboard text was confirmed
+                    in the sampled keyframes. Try a clearer street-front video
+                    clip or inspect the COCO activity breakdown below.
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 text-xs text-slate-400">
+                    Upload a street video or click{' '}
+                    <span className="font-medium text-white">
+                      Run Calibrated Demo Scan
+                    </span>{' '}
+                    to extract storefront OCR reads and collapse multi-frame
+                    duplicates.
+                  </div>
+                )}
+              </div>
+
+              {/* COCO Object Detection Activity Breakdown */}
+              <div className="space-y-2 border-t border-white/[0.08] pt-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">
+                    COCO Object &amp; Street Activity Signals
+                  </h3>
+                  <span className="font-mono text-[10px] text-[#A5B4FC]">
+                    {fusionResult
+                      ? fusionResult.detector_engine
+                      : 'COCO-SSD (person, vehicles, seating)'}
+                  </span>
+                </div>
+
+                {fusionResult &&
+                fusionResult.activity_summary.class_breakdown.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {fusionResult.activity_summary.class_breakdown.map(
+                      (cls) => (
+                        <div
+                          key={cls.class_name}
+                          className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-xs font-semibold capitalize text-white">
+                              {cls.class_name}
+                            </span>
+                            <span className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[9.5px] text-[#FDBA74]">
+                              {cls.total_detections} det
+                            </span>
+                          </div>
+                          <p className="mt-0.5 font-mono text-[10px] text-slate-400">
+                            Peak {cls.peak_per_frame}/frame ·{' '}
+                            {Math.round(cls.avg_confidence * 100)}% conf
+                          </p>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">
+                    Standard COCO object classes (pedestrians, cars, two-wheelers,
+                    chairs, benches, dining tables, umbrellas) are quantified
+                    here as street-activity context—never misrepresented as
+                    direct business classification.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 border-t border-white/[0.08] pt-2.5 flex items-center justify-between font-mono text-[10px] text-slate-400">
+              <span>
+                Temporal deduplication merges consecutive frame reads into a
+                single entity.
+              </span>
+              {fusionResult && (
+                <span className="text-emerald-300">
+                  Activity: {fusionResult.activity_summary.activity_level}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT PANEL: GROUND TRUTH FUSION — MAP BASELINE vs GROUND REALITY */}
+          <aside
+            aria-label="Ground Truth Fusion Panel"
+            className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5"
+          >
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-2 border-b border-white/[0.08] pb-3">
+                <div>
+                  <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#E879F9]">
+                    GROUND TRUTH FUSION
+                  </span>
+                  <h2 className="mt-0.5 font-display text-base font-semibold text-white xl:text-lg">
+                    Map Baseline vs Ground Reality
+                  </h2>
+                </div>
+                <Layers className="h-4 w-4 text-[#FB923C]" />
+              </div>
+
+              {/* MAP BASELINE vs GROUND REALITY Summary Table */}
+              <div
+                data-testid="fusion-comparison-summary"
+                className="rounded-2xl border border-white/[0.09] bg-white/[0.03] p-3.5 space-y-2"
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#818CF8]" />
+                    <span className="text-slate-300">
+                      Mapped baseline (0–300m)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded border border-[#818CF8]/35 bg-[#4F46E5]/15 px-1.5 py-0.5 font-mono text-[9px] text-[#C7D2FE]">
+                      DATABASE
+                    </span>
+                    <span
+                      data-testid="fusion-count-baseline"
+                      className="font-mono text-sm font-bold text-white"
+                    >
+                      {fusionResult
+                        ? fusionResult.counts.mapped_baseline_300m
+                        : baseline300m.length}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span className="text-slate-300">Observed in scan</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded border border-emerald-400/35 bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[9px] text-emerald-200">
+                      OBSERVED
+                    </span>
+                    <span
+                      data-testid="fusion-count-observed"
+                      className="font-mono text-sm font-bold text-white"
+                    >
+                      {fusionResult
+                        ? fusionResult.counts.observed_entities
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#FB923C]" />
+                    <span className="text-slate-300">
+                      Matched across both sources
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded border border-[#FB923C]/40 bg-[#F97316]/15 px-1.5 py-0.5 font-mono text-[9px] text-[#FED7AA]">
+                      INFERRED
+                    </span>
+                    <span
+                      data-testid="fusion-count-matched"
+                      className="font-mono text-sm font-bold text-[#FDBA74]"
+                    >
+                      {fusionResult
+                        ? fusionResult.counts.matched_entities
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-white/[0.08] pt-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-300" />
+                    <span className="font-semibold text-white">
+                      Additional observed signals
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-emerald-200">
+                      OBSERVED
+                    </span>
+                    <span
+                      data-testid="fusion-count-additional"
+                      className="font-mono text-sm font-bold text-emerald-300"
+                    >
+                      {fusionResult
+                        ? `+${fusionResult.counts.additional_signals}`
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { id: 'ALL', label: 'All' },
+                    { id: 'MATCHED', label: 'Matched (Inferred)' },
+                    {
+                      id: 'ADDITIONAL_SIGNAL',
+                      label: 'Additional Signals (Observed)',
+                    },
+                    { id: 'BASELINE_ONLY', label: 'Baseline Only (Database)' },
+                  ] as { id: LedgerFilter; label: string }[]
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setLedgerFilter(tab.id)}
+                    className={`rounded-xl border px-2.5 py-1 font-mono text-[10px] transition-all ${
+                      ledgerFilter === tab.id
+                        ? 'border-[#E879F9]/60 bg-[#9333EA]/25 font-semibold text-white'
+                        : 'border-white/10 bg-white/[0.03] text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Reconciled Evidence Ledger */}
+              <div
+                data-testid="reconciled-fusion-ledger"
+                className="max-h-[340px] space-y-2 overflow-y-auto pr-1"
+              >
+                {fusionResult ? (
+                  filteredLedger.length > 0 ? (
+                    filteredLedger.map((item) => {
+                      const badge =
+                        (item?.evidence_type &&
+                          EVIDENCE_BADGE_STYLE[item.evidence_type]) ||
+                        EVIDENCE_BADGE_STYLE.OBSERVED;
+                      return (
+                        <div
+                          key={item.fusion_id}
+                          className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-display text-xs font-semibold text-white">
+                                {item.name}
+                              </span>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-slate-400">
+                                <span>
+                                  Source: {item.sources.join(' + ')}
+                                </span>
+                                <span>·</span>
+                                <span>
+                                  Conf: {Math.round(item.confidence * 100)}%
+                                </span>
+                                {typeof item.distance_m === 'number' && (
+                                  <>
+                                    <span>·</span>
+                                    <span>{item.distance_m}m</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-semibold ${badge.bg}`}
+                            >
+                              {badge.label}
+                            </span>
+                          </div>
+
+                          <p className="mt-1.5 text-[11px] leading-relaxed text-slate-300/90">
+                            {item.explanation}
+                          </p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 text-xs text-slate-400">
+                      No items match the selected filter ({ledgerFilter}).
+                    </div>
+                  )
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-400">
+                      Awaiting Street Scan execution to reconcile against{' '}
+                      <span className="font-semibold text-white">
+                        {baseline300m.length} mapped 0–300m baseline entities
+                      </span>
+                      :
+                    </p>
+                    {baseline300m.slice(0, 5).map((place, pIdx) => (
+                      <div
+                        key={place.place_id || `${place.business_name || 'p'}-${pIdx}`}
+                        className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs"
+                      >
+                        <div className="truncate pr-2">
+                          <span className="font-medium text-slate-200">
+                            {place.business_name || 'Commercial Entity'}
+                          </span>
+                          <span className="ml-2 font-mono text-[10px] text-slate-400">
+                            {place.distance_m ?? 0}m · {place.source || 'Database'}
+                          </span>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-semibold ${EVIDENCE_BADGE_STYLE.DATABASE.bg}`}
+                        >
+                          DATABASE
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Continue to View 3 CTA + Evidence Taxonomy Legend Footer */}
+            <div className="mt-3.5 space-y-3 border-t border-white/[0.08] pt-3">
+              {onContinueToIntelligence && (
+                <button
+                  type="button"
+                  data-testid="continue-to-intelligence-button"
+                  onClick={() => onContinueToIntelligence(fusionResult)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-[#E879F9]/55 bg-[linear-gradient(135deg,rgba(79,70,229,0.68)_0%,rgba(168,85,247,0.56)_52%,rgba(249,115,22,0.58)_100%)] px-4 py-2.5 text-xs font-semibold tracking-wide text-white shadow-[0_12px_32px_-8px_rgba(147,51,234,0.55),inset_0_1px_0_rgba(255,255,255,0.28)] transition-all hover:border-[#FB923C] hover:brightness-110 focus:outline-none"
+                >
+                  <span>CONTINUE TO LOCATION INTELLIGENCE</span>
+                  <ArrowRight className="h-4 w-4 text-[#FDBA74]" />
+                </button>
+              )}
+
+              <div>
+                <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                  LOCUS Evidence Taxonomy
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(['OBSERVED', 'DATABASE', 'INFERRED'] as EvidenceType[]).map(
+                    (ev) => {
+                      const style = EVIDENCE_BADGE_STYLE[ev];
+                      return (
+                        <span
+                          key={ev}
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 font-mono text-[9.5px] font-semibold ${style.bg}`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${style.dot}`}
+                          />
+                          <span>{style.label}</span>
+                        </span>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  );
+};

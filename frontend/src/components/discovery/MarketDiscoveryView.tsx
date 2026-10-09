@@ -45,6 +45,7 @@ export interface MarketDiscoveryViewProps {
     localArea: string;
     candidateName: string;
     coordinates: { lat: number; lng: number };
+    marketBaseline: MarketBaselineResponse | null;
   }) => void;
 }
 
@@ -795,6 +796,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
       localArea: analysis.localArea,
       candidateName: analysis.candidateName,
       coordinates: analysis.coordinates,
+      marketBaseline: analysis.marketBaseline,
     });
   }, [profile, analysis, onContinueToGroundReality]);
 
@@ -919,11 +921,20 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
           >
             {PROGRESS_STEPS.map((step, index) => (
               <React.Fragment key={step.code}>
-                <div
-                  className={`inline-flex items-center gap-1.5 text-xs ${
+                <button
+                  type="button"
+                  disabled={step.code !== '01' && step.code !== '02'}
+                  onClick={() => {
+                    if (step.code === '02') {
+                      handleProceedToGroundReality();
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 text-xs transition-colors ${
                     step.active
                       ? 'font-semibold text-white'
-                      : 'text-slate-400/80'
+                      : step.code === '02'
+                      ? 'cursor-pointer text-slate-300 hover:text-white'
+                      : 'cursor-default text-slate-400/80'
                   }`}
                 >
                   <span
@@ -934,7 +945,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                     {step.code}
                   </span>
                   <span>{step.label}</span>
-                </div>
+                </button>
                 {index < PROGRESS_STEPS.length - 1 && (
                   <span className="text-xs text-slate-600" aria-hidden="true">
                     →
@@ -1487,7 +1498,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                       Market Baseline
                     </h3>
                     <p className="text-xs font-medium text-white">
-                      {profile.businessType} competitors
+                      Mapped {profile.businessType} competitors returned by provider
                     </p>
                   </div>
 

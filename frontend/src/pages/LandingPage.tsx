@@ -2,7 +2,20 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { HeroExperience } from '../components/landing/HeroExperience';
 import { MarketSystemSection } from '../components/marketSystem/MarketSystemSection';
 import { MarketDiscoveryView } from '../components/discovery/MarketDiscoveryView';
+import { StreetScanView } from '../components/groundReality/StreetScanView';
+import { LocationIntelligenceView } from '../components/intelligence/LocationIntelligenceView';
+import { DecisionReportView } from '../components/decision/DecisionReportView';
 import { ExperienceTransition } from '../components/transitions/ExperienceTransition';
+import { WorkspaceErrorBoundary } from '../components/common/WorkspaceErrorBoundary';
+import {
+  GroundRealityHandoffPayload,
+  StreetScanFusionResponse,
+} from '../types/streetScan';
+import {
+  LocationIntelligenceComparisonResponse,
+  ScenarioAssumptions,
+} from '../types/locationIntelligence';
+import { BASELINE_SCENARIO_ASSUMPTIONS } from '../utils/locationIntelligenceEngine';
 
 interface LandingPageProps {
   onEnterWorkspace?: () => void;
@@ -18,6 +31,17 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
   const [activeSection, setActiveSection] = useState<
     'page1' | 'page2' | 'view1'
   >('page1');
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<
+    'view1' | 'view2' | 'view3' | 'view4'
+  >('view1');
+  const [groundRealityHandoff, setGroundRealityHandoff] =
+    useState<GroundRealityHandoffPayload | null>(null);
+  const [streetScanFusionResult, setStreetScanFusionResult] =
+    useState<StreetScanFusionResponse | null>(null);
+  const [scenarioAssumptions, setScenarioAssumptions] =
+    useState<ScenarioAssumptions>(BASELINE_SCENARIO_ASSUMPTIONS);
+  const [intelligenceComparison, setIntelligenceComparison] =
+    useState<LocationIntelligenceComparisonResponse | undefined>(undefined);
   const [reducedMotion, setReducedMotion] = useState<boolean>(false);
 
   // Detect OS prefers-reduced-motion preference
@@ -37,7 +61,7 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
   // 1) scrollProgress (0.00 -> 1.00): Page 1 (Hero) -> Page 2 (Market System)
   // 2) workspaceEntryProgress (0.00 -> 1.00): Page 2 (Market System) -> Page 3 / View 1 (Market Discovery Workspace)
   useEffect(() => {
-    let rafId: number | null = null;
+    let rafId: number | null;
 
     const updateScroll = () => {
       const vh = Math.max(1, window.innerHeight);
@@ -87,6 +111,7 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
       });
     };
 
+    rafId = null;
     updateScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
@@ -150,6 +175,65 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
       behavior: reducedMotion ? 'auto' : 'smooth',
     });
   }, [reducedMotion]);
+
+  const scrollToWorkspaceTop = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.requestAnimationFrame(() => {
+      marketDiscoveryAnchorRef.current?.scrollIntoView({
+        behavior: reducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    });
+  }, [reducedMotion]);
+
+  const handleContinueToGroundReality = useCallback(
+    (payload: GroundRealityHandoffPayload) => {
+      setGroundRealityHandoff((prev) => {
+        if (
+          prev &&
+          payload?.coordinates &&
+          (Math.abs(prev.coordinates.lat - payload.coordinates.lat) > 0.0005 ||
+            Math.abs(prev.coordinates.lng - payload.coordinates.lng) > 0.0005)
+        ) {
+          setStreetScanFusionResult(null);
+        }
+        return payload;
+      });
+      setActiveWorkspaceView('view2');
+      scrollToWorkspaceTop();
+    },
+    [scrollToWorkspaceTop]
+  );
+
+  const handleContinueToIntelligence = useCallback(
+    (fusionResult: StreetScanFusionResponse | null) => {
+      setStreetScanFusionResult(fusionResult);
+      setActiveWorkspaceView('view3');
+      scrollToWorkspaceTop();
+    },
+    [scrollToWorkspaceTop]
+  );
+
+  const handleContinueToDecision = useCallback(
+    (payload: {
+      scenarioAssumptions: ScenarioAssumptions;
+      comparison: LocationIntelligenceComparisonResponse;
+    }) => {
+      setScenarioAssumptions(payload.scenarioAssumptions);
+      setIntelligenceComparison(payload.comparison);
+      setActiveWorkspaceView('view4');
+      scrollToWorkspaceTop();
+    },
+    [scrollToWorkspaceTop]
+  );
+
+  const handleSwitchWorkspaceView = useCallback(
+    (targetView: 'view1' | 'view2' | 'view3' | 'view4') => {
+      setActiveWorkspaceView(targetView);
+      scrollToWorkspaceTop();
+    },
+    [scrollToWorkspaceTop]
+  );
 
   const preferFallback = reducedMotion;
 
@@ -218,17 +302,82 @@ export const LandingPage: React.FC<LandingPageProps> = () => {
         </div>
       )}
 
-      {/* PAGE 3 / VIEW 1: LOCUS AI Workspace — 01 / Market Discovery */}
+      {/* PAGE 3: LOCUS AI Workspace — View 1 (01 / Market Discovery), View 2 (02 / Ground Reality), View 3 (03 / Intelligence), View 4 (04 / Decision) */}
       <div
         id="market-discovery-workspace"
         ref={marketDiscoveryAnchorRef}
         className="relative z-20 min-h-screen w-full bg-[#03020A]"
       >
-        <MarketDiscoveryView
-          entryProgress={workspaceEntryProgress}
-          preferFallback={preferFallback}
-          onBackToPage2={handleExploreMarket}
-        />
+        <div
+          className={
+            activeWorkspaceView !== 'view1' && groundRealityHandoff
+              ? 'hidden'
+              : 'block'
+          }
+        >
+          <MarketDiscoveryView
+            entryProgress={workspaceEntryProgress}
+            preferFallback={preferFallback}
+            onBackToPage2={handleExploreMarket}
+            onContinueToGroundReality={handleContinueToGroundReality}
+          />
+        </div>
+
+        {groundRealityHandoff && (
+          <div className={activeWorkspaceView === 'view2' ? 'block' : 'hidden'}>
+            <WorkspaceErrorBoundary
+              viewName="Ground Reality (02 / Street Scan)"
+              onReset={() => handleSwitchWorkspaceView('view1')}
+            >
+              <StreetScanView
+                handoff={groundRealityHandoff}
+                preferFallback={preferFallback}
+                onBackToMarketDiscovery={() => handleSwitchWorkspaceView('view1')}
+                onContinueToIntelligence={handleContinueToIntelligence}
+              />
+            </WorkspaceErrorBoundary>
+          </div>
+        )}
+
+        {groundRealityHandoff && (
+          <div className={activeWorkspaceView === 'view3' ? 'block' : 'hidden'}>
+            <WorkspaceErrorBoundary
+              viewName="Location Intelligence (03)"
+              onReset={() => handleSwitchWorkspaceView('view1')}
+            >
+              <LocationIntelligenceView
+                handoff={{
+                  ...groundRealityHandoff,
+                  streetScanFusion: streetScanFusionResult,
+                }}
+                preferFallback={preferFallback}
+                onBackToMarketDiscovery={() => handleSwitchWorkspaceView('view1')}
+                onBackToGroundReality={() => handleSwitchWorkspaceView('view2')}
+                onContinueToDecision={handleContinueToDecision}
+              />
+            </WorkspaceErrorBoundary>
+          </div>
+        )}
+
+        {groundRealityHandoff && activeWorkspaceView === 'view4' && (
+          <WorkspaceErrorBoundary
+            viewName="Market Entry Decision Report (04)"
+            onReset={() => handleSwitchWorkspaceView('view1')}
+          >
+            <DecisionReportView
+              handoff={{
+                ...groundRealityHandoff,
+                streetScanFusion: streetScanFusionResult,
+                scenarioAssumptions,
+                intelligenceComparison,
+              }}
+              preferFallback={preferFallback}
+              onBackToMarketDiscovery={() => handleSwitchWorkspaceView('view1')}
+              onBackToGroundReality={() => handleSwitchWorkspaceView('view2')}
+              onBackToIntelligence={() => handleSwitchWorkspaceView('view3')}
+            />
+          </WorkspaceErrorBoundary>
+        )}
       </div>
 
       {/* Right-Edge Stage Indicator (Page 1 Vision, Page 2 Understand the Market, Page 3 / View 1 Market Discovery) */}

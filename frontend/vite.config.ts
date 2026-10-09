@@ -1,6 +1,8 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { createMarketBaselineMiddleware } from './server/marketBaselineApi';
+import { createStreetScanMiddleware } from './server/streetScanApi';
+import { createLocationIntelligenceMiddleware } from './server/locationIntelligenceApi';
 
 export default defineConfig(({ mode }) => {
   const rootCwd = (globalThis as any).process?.cwd?.() || '.';
@@ -16,9 +18,13 @@ export default defineConfig(({ mode }) => {
         name: 'locus-market-baseline-api',
         configureServer(server) {
           server.middlewares.use(createMarketBaselineMiddleware(env) as any);
+          server.middlewares.use(createStreetScanMiddleware() as any);
+          server.middlewares.use(createLocationIntelligenceMiddleware() as any);
         },
         configurePreviewServer(server) {
           server.middlewares.use(createMarketBaselineMiddleware(env) as any);
+          server.middlewares.use(createStreetScanMiddleware() as any);
+          server.middlewares.use(createLocationIntelligenceMiddleware() as any);
         },
       },
     ],
