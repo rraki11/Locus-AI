@@ -100,8 +100,8 @@ export function getViewKeyForPath(pathname: string): WorkspaceViewKey | null {
   const clean = pathname.replace(/\/$/, '') || '/';
   if (clean === '/market-discovery' || clean === '/workspace') return 'view1';
   if (clean === '/ground-reality') return 'view2';
-  if (clean === '/intelligence') return 'view3';
-  if (clean === '/decision') return 'view4';
+  if (clean === '/intelligence' || clean === '/location-intelligence') return 'view3';
+  if (clean === '/decision' || clean === '/report') return 'view4';
   return null;
 }
 

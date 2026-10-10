@@ -1315,7 +1315,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
         {/* SECTION 7: EVIDENCE LEDGER */}
         <section
           data-testid="report-section-evidence-ledger"
-          className="liquid-glass-dark rounded-3xl p-5 space-y-4 print-page-break-before"
+          className="liquid-glass-dark rounded-3xl p-5 space-y-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
             <div>
@@ -1400,11 +1400,11 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
         </section>
 
         {/* SECTION 8 & SECTION 9 SIDE-BY-SIDE */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 print:grid-cols-2 print:gap-3 print-page-break-before">
           {/* SECTION 8: RISKS & LIMITATIONS */}
           <section
             data-testid="report-section-risks-limitations"
-            className="liquid-glass-dark rounded-3xl p-5 space-y-3.5 lg:col-span-6"
+            className="liquid-glass-dark rounded-3xl p-5 space-y-3.5 lg:col-span-6 print:col-span-1"
           >
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div>
@@ -1451,7 +1451,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
           {/* SECTION 9: FINAL DECISION POSTURE */}
           <section
             data-testid="report-section-final-posture"
-            className={`liquid-glass-dark rounded-3xl border p-5 space-y-4 lg:col-span-6 ${postureStyle.border}`}
+            className={`liquid-glass-dark rounded-3xl border p-5 space-y-4 lg:col-span-6 print:col-span-1 ${postureStyle.border}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.10] pb-3">
               <div>
