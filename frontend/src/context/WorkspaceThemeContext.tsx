@@ -22,6 +22,10 @@ export interface StageThemeSpec {
   ambientPrimary: string;
   ambientSecondary: string;
   ambientAccent: string;
+  // Glassmorphic custom scrollbar styling
+  scrollbarThumb: string;
+  scrollbarThumbHover: string;
+  scrollbarGlow: string;
   isLightMode?: boolean;
 }
 
@@ -44,6 +48,9 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     ambientPrimary: 'rgba(16, 185, 129, 0.28)', // Emerald aura
     ambientSecondary: 'rgba(6, 95, 70, 0.30)', // Deep emerald glow
     ambientAccent: 'rgba(110, 231, 183, 0.22)', // Mint sheen
+    scrollbarThumb: 'rgba(16, 185, 129, 0.28)',
+    scrollbarThumbHover: 'rgba(110, 231, 183, 0.65)',
+    scrollbarGlow: 'rgba(16, 185, 129, 0.45)',
     isLightMode: false,
   },
   view2: {
@@ -64,6 +71,9 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     ambientPrimary: 'rgba(20, 184, 166, 0.28)', // Cyber teal
     ambientSecondary: 'rgba(14, 165, 233, 0.24)', // Electric sky
     ambientAccent: 'rgba(94, 234, 212, 0.20)', // Mint sheen
+    scrollbarThumb: 'rgba(20, 184, 166, 0.28)',
+    scrollbarThumbHover: 'rgba(94, 234, 212, 0.65)',
+    scrollbarGlow: 'rgba(20, 184, 166, 0.45)',
     isLightMode: false,
   },
   view3: {
@@ -84,6 +94,9 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     ambientPrimary: 'rgba(56, 189, 248, 0.28)', // Electric cyan
     ambientSecondary: 'rgba(30, 64, 175, 0.28)', // Deep sapphire glow
     ambientAccent: 'rgba(125, 211, 252, 0.22)', // Pale blue sheen
+    scrollbarThumb: 'rgba(56, 189, 248, 0.28)',
+    scrollbarThumbHover: 'rgba(186, 230, 253, 0.65)',
+    scrollbarGlow: 'rgba(56, 189, 248, 0.45)',
     isLightMode: false,
   },
   view4: {
@@ -104,6 +117,9 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     ambientPrimary: 'rgba(16, 185, 129, 0.30)', // Emerald aura
     ambientSecondary: 'rgba(6, 95, 70, 0.30)', // Deep emerald glow
     ambientAccent: 'rgba(110, 231, 183, 0.20)', // Mint sheen
+    scrollbarThumb: 'rgba(16, 185, 129, 0.28)',
+    scrollbarThumbHover: 'rgba(167, 243, 208, 0.65)',
+    scrollbarGlow: 'rgba(16, 185, 129, 0.45)',
     isLightMode: false,
   },
 };
@@ -163,6 +179,9 @@ export const WorkspaceThemeProvider: React.FC<WorkspaceThemeProviderProps> = ({
     root.style.setProperty('--stage-ambient-accent', activeTheme.ambientAccent);
     root.style.setProperty('--stage-header-bg', activeTheme.headerBg);
     root.style.setProperty('--stage-header-border', activeTheme.headerBorder);
+    root.style.setProperty('--stage-scrollbar-thumb', activeTheme.scrollbarThumb);
+    root.style.setProperty('--stage-scrollbar-thumb-hover', activeTheme.scrollbarThumbHover);
+    root.style.setProperty('--stage-scrollbar-glow', activeTheme.scrollbarGlow);
   }, [activeTheme]);
 
   return (

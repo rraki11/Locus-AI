@@ -207,7 +207,7 @@ export const GroundTruthStage: React.FC<GroundTruthStageProps> = ({ onNext }) =>
             </span>
           </div>
 
-          <div className="max-h-[380px] flex-1 space-y-1.5 overflow-y-auto pr-1">
+          <div className="max-h-[380px] flex-1 space-y-1.5 overflow-y-auto pr-1.5 custom-scrollbar">
             {baselineEntities.map((entity) => {
               const isSelected = activeEntity.id === entity.id;
               return (
@@ -256,7 +256,7 @@ export const GroundTruthStage: React.FC<GroundTruthStageProps> = ({ onNext }) =>
             <Layers className="h-4 w-4 text-emerald-400" />
           </div>
 
-          <div className="max-h-[380px] flex-1 space-y-1.5 overflow-y-auto pr-1">
+          <div className="max-h-[380px] flex-1 space-y-1.5 overflow-y-auto pr-1.5 custom-scrollbar">
             {filteredGroundEntities.map((entity) => {
               const meta = EVIDENCE_META[entity.groundEvidence];
               const isNewSignal = !entity.inBaselineDatabase;

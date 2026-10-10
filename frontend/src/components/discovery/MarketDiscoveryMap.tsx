@@ -69,6 +69,7 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     null
   );
   const [tilesReady, setTilesReady] = useState<boolean>(false);
+  const [currentZoom, setCurrentZoom] = useState<number>(15);
 
   const validCoords = parseAndValidateCoordinates(analysis.coordinates) ?? {
     lat: 17.4319,
@@ -87,6 +88,7 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     if (!Number.isFinite(activeLat) || !Number.isFinite(activeLng)) return;
 
     const initialZoom = isResolved ? 15 : 5;
+    setCurrentZoom(initialZoom);
 
     const map = L.map(container, {
       center: [activeLat, activeLng],
@@ -94,6 +96,10 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
       zoomControl: false,
       attributionControl: true,
       preferCanvas: true,
+    });
+
+    map.on('zoomend', () => {
+      setCurrentZoom(map.getZoom());
     });
 
     L.control
@@ -243,19 +249,25 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     // (0-300m Ground Reality, 300m-2km Local Market, 2-5km Wider Market)
     if (isResolved) {
       [...LOCUS_SPATIAL_RINGS].reverse().forEach((ring) => {
+        const isScopeActive =
+          (activeScope === 'ground' && ring.bandKey === '0-300m') ||
+          (activeScope === 'local' && ring.bandKey === '300m-2km') ||
+          (activeScope === 'wider' && ring.bandKey === '2-5km');
+
         L.circle([activeLat, activeLng], {
           radius: ring.radiusMeters,
           color: ring.strokeColor,
-          weight: ring.id === 'ground-reality' ? 2.2 : 1.35,
-          opacity: ring.id === 'ground-reality' ? 0.92 : 0.56,
+          weight: isScopeActive ? 2.6 : 1.2,
+          opacity: isScopeActive ? 0.95 : 0.40,
           fillColor: ring.strokeColor,
-          fillOpacity:
-            ring.id === 'ground-reality'
-              ? 0.09
+          fillOpacity: isScopeActive
+            ? ring.id === 'ground-reality'
+              ? 0.12
               : ring.id === 'local-market'
-              ? 0.035
-              : 0.015,
-          dashArray: ring.dashArray,
+              ? 0.06
+              : 0.03
+            : 0.015,
+          dashArray: isScopeActive ? undefined : ring.dashArray,
           interactive: false,
         }).addTo(group);
       });
@@ -268,9 +280,11 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
           return;
         }
         const bandStyle = SPATIAL_BAND_MARKER_STYLE[place.spatial_band];
+        // Prevent label collision: only show inline chips when zoomed in (>= 15) and for top 3 nearest places
         const showInlineChip =
-          place.spatial_band === '0-300m' ||
-          (place.spatial_band === '300m-2km' && idx < 6);
+          currentZoom >= 15 &&
+          place.spatial_band === '0-300m' &&
+          idx < 3;
         const isNorth = place.latitude >= activeLat;
         const isEast = place.longitude >= activeLng;
         const translateX = isEast ? '10px' : 'calc(-100% - 10px)';
@@ -458,6 +472,8 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     analysis,
     activeLat,
     activeLng,
+    activeScope,
+    currentZoom,
     baselinePlaces,
     isResolved,
     onUpdateCoordinates,
@@ -470,13 +486,13 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     : 'Choose where you want to investigate';
 
   return (
-    <div className="relative h-full min-h-[540px] w-full overflow-hidden rounded-3xl border-t border-l border-r border-b border-t-[#D8B4FE]/30 border-l-[#818CF8]/25 border-r-[#FB923C]/18 border-b-[#FB923C]/14 bg-[#05040E]/90 shadow-[0_32px_72px_-18px_rgba(2,1,8,0.92)] xl:min-h-[640px]">
+    <div className="relative h-full min-h-[540px] w-full overflow-hidden rounded-3xl border border-white/[0.08] bg-[#05040E]/90 shadow-[0_32px_72px_-18px_rgba(2,1,8,0.92)] xl:min-h-[640px]">
       {/* Subtle Spatial Grid Behind Map Tiles */}
       <div
         className="pointer-events-none absolute inset-0 z-0"
         style={{
           backgroundImage:
-            'linear-gradient(to right, rgba(168, 85, 247, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(129, 140, 248, 0.05) 1px, transparent 1px)',
+            'linear-gradient(to right, rgba(16, 185, 129, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(52, 211, 153, 0.04) 1px, transparent 1px)',
           backgroundSize: '48px 48px',
           opacity: tilesReady ? 0.25 : 0.65,
         }}
@@ -497,7 +513,7 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
           <span
             className={`h-2 w-2 rounded-full ${
               isResolved
-                ? 'bg-gradient-to-tr from-[#E879F9] to-[#FB923C] shadow-[0_0_8px_rgba(249,115,22,0.85)]'
+                ? 'bg-gradient-to-tr from-[#10B981] to-[#FB923C] shadow-[0_0_8px_rgba(16,185,129,0.85)]'
                 : 'bg-slate-400'
             }`}
           />
@@ -511,7 +527,7 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
           )}
         </div>
 
-        {/* Spatial Catchment Scope Control */}
+        {/* Spatial Catchment Scope Control (Distance Band Selector) */}
         <div className="liquid-glass-control pointer-events-auto inline-flex items-center gap-1 rounded-2xl p-1">
           {(
             [
@@ -529,7 +545,7 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
                 title={scope.title}
                 className={`rounded-xl px-2.5 py-1 text-xs transition-all ${
                   isCurrent
-                    ? 'bg-gradient-to-r from-[#4F46E5]/55 via-[#9333EA]/45 to-[#F97316]/40 font-medium text-white ring-1 ring-[#C084FC]/55'
+                    ? 'border border-emerald-500/50 bg-emerald-500/25 font-semibold text-white shadow-[0_0_12px_rgba(16,185,129,0.35)]'
                     : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
                 }`}
               >

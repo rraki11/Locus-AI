@@ -246,7 +246,7 @@ export const DiscoveryStage: React.FC<DiscoveryStageProps> = ({
               </span>
             </div>
 
-            <div className="grid max-h-[215px] grid-cols-2 gap-1.5 overflow-y-auto pr-1">
+            <div className="grid max-h-[215px] grid-cols-2 gap-1.5 overflow-y-auto pr-1.5 custom-scrollbar">
               {baselineEntities.map((ent) => {
                 const active = ent.id === selectedEntity.id;
                 return (

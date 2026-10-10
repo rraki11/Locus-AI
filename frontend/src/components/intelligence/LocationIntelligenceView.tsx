@@ -487,7 +487,7 @@ export const LocationIntelligenceView: React.FC<
               {/* 8 Factors List */}
               <div
                 data-testid="location-intelligence-factors-list"
-                className="space-y-2 max-h-[460px] overflow-y-auto pr-1"
+                className="space-y-2 max-h-[460px] overflow-y-auto pr-1.5 custom-scrollbar"
               >
                 {activeEvaluation.factors.map((factor) => {
                   const isSelected = factor.key === selectedFactor.key;

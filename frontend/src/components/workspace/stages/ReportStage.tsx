@@ -269,7 +269,7 @@ export const ReportStage: React.FC<ReportStageProps> = ({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-white/10 bg-white/[0.02] font-mono text-[10px] uppercase tracking-[0.15em] text-slate-400">

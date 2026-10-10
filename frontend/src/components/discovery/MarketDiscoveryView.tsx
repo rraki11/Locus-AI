@@ -955,6 +955,25 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
     },
   ];
 
+  const formatConciseSignalExplanation = (
+    _key: string,
+    explanation: string
+  ): string => {
+    if (!explanation) return 'Signal evaluated from baseline data.';
+    let clean = explanation
+      .replace(
+        /\s*returned across (all )?three catchment bands,?\s*/i,
+        ', '
+      )
+      .replace(
+        /\s*Street-level access verification is reserved for Ground Reality scan\.?\s*/i,
+        ''
+      )
+      .trim();
+    if (clean.endsWith(',')) clean = clean.slice(0, -1) + '.';
+    return clean;
+  };
+
   const factorEntries: {
     key: string;
     label: string;
@@ -1097,32 +1116,32 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
           {/* LEFT PANEL: Market Setup + Hierarchical Location Inputs */}
           <aside
             aria-label="Market Setup"
-            className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5"
+            className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5 pr-2.5 xl:pr-3.5 max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar"
             style={{
               opacity: sidePanelOpacity,
               transform: `translate3d(0, ${sidePanelTranslateY.toFixed(1)}px, 0)`,
             }}
           >
-            <div className="space-y-3.5 xl:space-y-4">
+            <div className="space-y-4">
               <div>
                 <h2 className="font-display text-base font-semibold text-white xl:text-lg">
                   Market Setup
                 </h2>
-                <p className="mt-0.5 text-xs text-slate-300/80">
-                  Configure business profile and target location.
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Define your business and target location.
                 </p>
               </div>
 
               {/* USER-DEFINED BUSINESS PROFILE & INTERPRETATION */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-slate-300">
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-1.5">
+                  <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">
                     Business Profile &amp; Budget
-                  </p>
+                  </h3>
                   <button
                     type="button"
                     onClick={() => setShowAdvancedProfileEdit((prev) => !prev)}
-                    className="inline-flex items-center gap-1 font-mono text-[10px] text-[#C084FC] hover:underline"
+                    className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-400 hover:text-emerald-400 transition-colors"
                   >
                     <Edit3 className="h-3 w-3" />
                     <span>{showAdvancedProfileEdit ? 'Hide Details' : 'Edit All Fields'}</span>
@@ -1135,7 +1154,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                     htmlFor="discovery-business-description"
                     className="block text-[11px] font-medium text-slate-300 mb-1"
                   >
-                    Describe your business idea <span className="text-[#FB923C]">*</span>
+                    Business idea <span className="text-[#FB923C]">*</span>
                   </label>
                   <textarea
                     id="discovery-business-description"
@@ -1150,36 +1169,36 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                       }));
                     }}
                     placeholder="e.g. Small tea and snacks stall near a college with ₹30,000, mainly serving students."
-                    className="liquid-glass-subtle w-full rounded-xl p-2.5 text-xs text-white placeholder:text-slate-400 focus:border-[#C084FC] focus:outline-none"
+                    className="liquid-glass-subtle w-full rounded-xl p-2.5 text-xs text-white placeholder:text-slate-400 focus:border-emerald-500/60 focus:outline-none"
                   />
                   <div className="mt-1 flex items-center justify-between">
                     <button
                       type="button"
                       data-testid="interpret-description-button"
                       onClick={() => handleInterpretDescription(descriptionInput)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-[#C084FC]/40 bg-[#9333EA]/20 px-2 py-0.5 font-mono text-[10px] font-semibold text-[#E9D5FF] transition-all hover:bg-[#9333EA]/35 hover:text-white"
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-300 transition-all hover:bg-emerald-500/20 hover:text-white"
                     >
                       <Sparkles className="h-2.5 w-2.5 text-[#FB923C]" />
                       <span>Interpret with Rules</span>
                     </button>
-                    <span className="font-mono text-[9.5px] text-slate-400">
-                      Rule-based analyzer (no LLM)
+                    <span className="font-mono text-[9px] text-slate-500">
+                      Rule-based analyzer
                     </span>
                   </div>
                 </div>
 
-                {/* Sample Presets (clearly labeled as examples) */}
+                {/* Sample Presets in a compact horizontally scrollable row */}
                 <div className="space-y-1">
                   <span className="block font-mono text-[9px] uppercase tracking-wider text-slate-400">
-                    Sample Examples (Optional):
+                    Sample Examples
                   </span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                     {SAMPLE_BUSINESS_PROFILES.map((sample) => (
                       <button
                         key={sample.id}
                         type="button"
                         onClick={() => handleLoadSampleProfile(sample)}
-                        className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10.5px] text-slate-300 transition-colors hover:border-[#FB923C]/50 hover:bg-[#F97316]/10 hover:text-white"
+                        className="shrink-0 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] text-slate-300 transition-colors hover:border-[#FB923C]/50 hover:bg-[#F97316]/10 hover:text-white"
                       >
                         {sample.title}
                       </button>
@@ -1209,11 +1228,11 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                       type="text"
                       value={budgetInputStr}
                       onChange={(e) => handleBudgetInputChange(e.target.value)}
-                      placeholder="Enter your available budget in ₹ (e.g. 30000, ₹50,000, 15L)"
+                      placeholder="Enter budget (e.g. ₹50,000, 15L)"
                       className={`liquid-glass-subtle w-full rounded-xl py-1.5 pl-3 pr-3 text-xs font-medium text-white transition-colors focus:outline-none ${
                         budgetValidationError
                           ? 'border-amber-400/80 focus:border-amber-400'
-                          : 'focus:border-[#C084FC]'
+                          : 'focus:border-emerald-500/60'
                       }`}
                     />
                   </div>
@@ -1227,7 +1246,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                     </p>
                   ) : (
                     <p className="mt-0.5 text-[10px] text-slate-400">
-                      Total available capital. Distinguishes small setups (e.g. ₹20k–₹50k) from large outlets.
+                      Total capital available for setup.
                     </p>
                   )}
                 </div>
@@ -1239,7 +1258,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                       htmlFor="discovery-business-type"
                       className="block text-[10.5px] font-medium text-slate-300 mb-0.5"
                     >
-                      Business Type / Category
+                      Business Type
                     </label>
                     <div className="relative">
                       <select
@@ -1247,7 +1266,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                         data-testid="discovery-business-type"
                         value={profile.businessType}
                         onChange={(e) => handleBusinessTypeChange(e.target.value)}
-                        className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-2.5 pr-6 text-xs font-medium text-white transition-colors focus:border-[#C084FC] focus:outline-none"
+                        className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-2.5 pr-6 text-xs font-medium text-white transition-colors focus:border-emerald-500/60 focus:outline-none"
                       >
                         {BUSINESS_PROFILE_OPTIONS.businessTypes.map((type) => (
                           <option
@@ -1268,7 +1287,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                       htmlFor="discovery-format"
                       className="block text-[10.5px] font-medium text-slate-300 mb-0.5"
                     >
-                      Business Format
+                      Format
                     </label>
                     <div className="relative">
                       <select
@@ -1281,7 +1300,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                             preferredFormat: e.target.value,
                           }))
                         }
-                        className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-2.5 pr-6 text-xs text-white transition-colors focus:border-[#C084FC] focus:outline-none"
+                        className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-2.5 pr-6 text-xs text-white transition-colors focus:border-emerald-500/60 focus:outline-none"
                       >
                         {AVAILABLE_BUSINESS_FORMATS.map((fmt) => (
                           <option
@@ -1318,14 +1337,14 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                       }))
                     }
                     placeholder="e.g. College students, office workers"
-                    className="liquid-glass-subtle w-full rounded-xl py-1.5 px-3 text-xs text-white transition-colors focus:border-[#C084FC] focus:outline-none"
+                    className="liquid-glass-subtle w-full rounded-xl py-1.5 px-3 text-xs text-white transition-colors focus:border-emerald-500/60 focus:outline-none"
                   />
                 </div>
 
                 {/* Optional Strategic Priorities */}
                 <div>
                   <span className="block text-[10.5px] font-medium text-slate-300 mb-1">
-                    Primary Priorities
+                    Priorities
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {AVAILABLE_BUSINESS_PRIORITIES.map((pri) => {
@@ -1363,7 +1382,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                     className="rounded-xl border border-white/10 bg-white/[0.02] p-2.5 space-y-1 text-xs"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-[#A5B4FC]">
+                      <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-emerald-300">
                         Rule Analysis Provenance:
                       </span>
                       <span
@@ -1379,7 +1398,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                     <ul className="space-y-0.5 text-[10.5px] text-slate-300">
                       {interpretationFeedback.notes.map((note, idx) => (
                         <li key={idx} className="flex items-start gap-1.5">
-                          <span className="text-[#818CF8]">•</span>
+                          <span className="text-emerald-400">•</span>
                           <span>{note}</span>
                         </li>
                       ))}
@@ -1402,11 +1421,11 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                 }}
                 className="space-y-2.5"
               >
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] pb-1.5">
                   <div className="flex items-center gap-2">
-                    <p className="text-xs font-medium text-slate-300">
-                      Location Hierarchy
-                    </p>
+                    <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">
+                      Location
+                    </h3>
                     {searchFeedbackMessage && (
                       <span
                         data-testid="location-search-feedback"
@@ -1414,7 +1433,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                           locationNotFoundError
                             ? 'text-amber-300'
                             : isLocating
-                            ? 'text-[#818CF8]'
+                            ? 'text-emerald-400'
                             : 'text-[#FB923C]'
                         }`}
                       >
@@ -1426,7 +1445,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                   <button
                     type="submit"
                     data-testid="location-locate-button"
-                    className="liquid-glass-control inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold text-[#F3E8FF] transition-all hover:border-[#E879F9] hover:text-white"
+                    className="liquid-glass-control inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold text-white transition-all hover:border-emerald-500/60"
                   >
                     <Search className="h-3 w-3 text-[#FB923C]" />
                     <span>LOCATE</span>
@@ -1437,7 +1456,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                 <div>
                   <label
                     htmlFor="discovery-state-input"
-                    className="mb-1 block text-xs text-slate-400"
+                    className="mb-0.5 block text-[10.5px] font-medium text-slate-400"
                   >
                     State
                   </label>
@@ -1461,8 +1480,8 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                           );
                         }
                       }}
-                      placeholder="Enter state (e.g. Telangana)"
-                      className="liquid-glass-subtle w-full rounded-xl py-1.5 pl-3 pr-8 text-sm text-white placeholder-slate-500 transition-colors focus:border-[#C084FC] focus:outline-none xl:py-2"
+                      placeholder="e.g. Karnataka"
+                      className="liquid-glass-subtle w-full rounded-xl py-1.5 pl-3 pr-8 text-xs text-white placeholder-slate-500 transition-colors focus:border-emerald-500/60 focus:outline-none"
                     />
                     {stateInput && (
                       <button
@@ -1496,7 +1515,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                 <div>
                   <label
                     htmlFor="discovery-city-input"
-                    className="mb-1 block text-xs text-slate-400"
+                    className="mb-0.5 block text-[10.5px] font-medium text-slate-400"
                   >
                     City
                   </label>
@@ -1520,8 +1539,8 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                           );
                         }
                       }}
-                      placeholder="Enter city (e.g. Hyderabad)"
-                      className="liquid-glass-subtle w-full rounded-xl py-1.5 pl-3 pr-8 text-sm text-white placeholder-slate-500 transition-colors focus:border-[#C084FC] focus:outline-none xl:py-2"
+                      placeholder="e.g. Bengaluru"
+                      className="liquid-glass-subtle w-full rounded-xl py-1.5 pl-3 pr-8 text-xs text-white placeholder-slate-500 transition-colors focus:border-emerald-500/60 focus:outline-none"
                     />
                     {cityInput && (
                       <button
@@ -1554,7 +1573,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                 <div>
                   <label
                     htmlFor="discovery-local-area-input"
-                    className="mb-1 block text-xs text-slate-400"
+                    className="mb-0.5 block text-[10.5px] font-medium text-slate-400"
                   >
                     Local area{' '}
                     <span className="text-slate-500">(optional)</span>
@@ -1579,8 +1598,8 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                           );
                         }
                       }}
-                      placeholder="Neighborhood (e.g. Jubilee Hills)"
-                      className="liquid-glass-subtle w-full rounded-xl py-1.5 pl-3 pr-8 text-sm text-white placeholder-slate-500 transition-colors focus:border-[#C084FC] focus:outline-none xl:py-2"
+                      placeholder="e.g. Koramangala"
+                      className="liquid-glass-subtle w-full rounded-xl py-1.5 pl-3 pr-8 text-xs text-white placeholder-slate-500 transition-colors focus:border-emerald-500/60 focus:outline-none"
                     />
                     {localAreaInput && (
                       <button
@@ -1616,9 +1635,8 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                     {locationNotFoundError}
                   </p>
                 ) : (
-                  <p className="pt-0.5 text-xs leading-relaxed text-slate-400">
-                    Click the map or drag the pin to refine exact candidate
-                    coordinates.
+                  <p className="pt-0.5 text-[11px] leading-relaxed text-slate-400">
+                    Click the map or drag the pin to refine candidate coordinates.
                   </p>
                 )}
               </form>
@@ -1661,20 +1679,20 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
             />
           </div>
 
-          {/* RIGHT PANEL: Preserved Location Hierarchy + Real Market Baseline + Evidence-Tied Factors */}
+          {/* RIGHT PANEL: Location Summary + Market Baseline + Key Market Signals */}
           <aside
             aria-label="Location Summary"
-            className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5"
+            className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5 pr-2.5 xl:pr-3.5 max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar"
             style={{
               opacity: sidePanelOpacity,
               transform: `translate3d(0, ${sidePanelTranslateY.toFixed(1)}px, 0)`,
             }}
           >
-            <div className="space-y-3.5">
-              {/* 1. LOCATION HIERARCHY BLOCK (Always preserves State, City, Local Area, Candidate Coords) */}
+            <div className="space-y-4">
+              {/* SECTION A: LOCATION */}
               <div>
-                <div className="flex items-center justify-between">
-                  <h2 className="bg-gradient-to-r from-[#A5B4FC] via-[#E879F9] to-[#FB923C] bg-clip-text font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-transparent">
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-1.5">
+                  <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-400">
                     Location
                   </h2>
                   <span
@@ -1684,7 +1702,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                         ? 'text-[#FB923C]'
                         : analysis.locationStatus === 'NOT_FOUND'
                         ? 'text-amber-300'
-                        : 'text-[#818CF8]'
+                        : 'text-emerald-400'
                     }`}
                   >
                     {analysis.locationStatusLabel}
@@ -1733,7 +1751,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2 border-t border-white/[0.07] pt-1.5">
-                    <span className="text-slate-400">Candidate</span>
+                    <span className="text-slate-400">Candidate Coords</span>
                     <span
                       data-testid="location-summary-coords"
                       className="font-mono text-[11px] font-medium text-[#FDBA74]"
@@ -1747,26 +1765,21 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                       className="truncate pt-0.5 text-[10px] text-slate-400/80"
                       title={analysis.resolvedAddress}
                     >
-                      Ref: {analysis.resolvedAddress}
+                      {analysis.resolvedAddress}
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* 2. MARKET BASELINE BLOCK (Spatial Competitor Counts + Source + Coverage) */}
-              <div className="border-t border-white/[0.08] pt-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div>
-                    <h3 className="bg-gradient-to-r from-[#A5B4FC] via-[#E879F9] to-[#FB923C] bg-clip-text font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-transparent">
-                      Market Baseline
-                    </h3>
-                    <p className="text-xs font-medium text-white">
-                      Mapped {profile.businessType} competitors returned by provider
-                    </p>
-                  </div>
+              {/* SECTION B: MARKET BASELINE */}
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2 border-b border-white/[0.06] pb-1.5">
+                  <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-400">
+                    Market Baseline
+                  </h3>
 
                   {isAnalyzing ? (
-                    <span className="inline-flex items-center gap-1 font-mono text-[10px] text-[#818CF8]">
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-400">
                       <RefreshCw className="h-3 w-3 animate-spin" />
                       <span>QUERYING</span>
                     </span>
@@ -1775,8 +1788,8 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                       data-testid="market-intelligence-status"
                       className={`rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] font-semibold ${
                         activeBaseline?.data_mode === 'LIVE'
-                          ? 'border-[#FB923C]/40 bg-[#F97316]/15 text-[#FDBA74]'
-                          : 'border-[#C084FC]/35 bg-[#6D28D9]/20 text-[#E9D5FF]'
+                          ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                          : 'border-emerald-500/35 bg-emerald-950/40 text-emerald-300'
                       }`}
                     >
                       {activeBaseline?.data_mode === 'LIVE'
@@ -1786,11 +1799,18 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                   )}
                 </div>
 
-                {/* Exclusive Spatial Band Competitor Counts */}
+                {/* Competitor Counts + Source + Coverage */}
                 <div
                   data-testid="spatial-band-counts"
                   className="liquid-glass-subtle space-y-1.5 rounded-2xl p-3"
                 >
+                  <div className="flex items-center justify-between pb-1 border-b border-white/[0.07] text-[11px]">
+                    <span className="text-slate-300 font-medium">Returned by Provider</span>
+                    <span className="font-mono font-semibold text-white">
+                      {activeBaseline?.total_mapped ?? 0} businesses
+                    </span>
+                  </div>
+
                   {spatialBands.map((band) => {
                     const ringMeta = LOCUS_SPATIAL_RINGS.find(
                       (r) => r.bandKey === band.band
@@ -1810,24 +1830,21 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                           <span className="font-mono text-[11px] text-slate-200">
                             {band.label}
                           </span>
-                          <span className="text-[11px] text-slate-400">
-                            ({band.title})
-                          </span>
                         </div>
-                        <span className="font-mono text-[11px] font-semibold text-white">
-                          {band.count} mapped
+                        <span className="font-mono text-[11px] font-medium text-white">
+                          {band.count}
                         </span>
                       </div>
                     );
                   })}
 
                   <div className="mt-2 flex items-center justify-between border-t border-white/[0.07] pt-2 text-[11px]">
-                    <span className="text-slate-400">Source</span>
+                    <span className="text-slate-400">Data source</span>
                     <span
                       data-testid="baseline-source-label"
                       className="inline-flex items-center gap-1 font-mono text-[10.5px] text-slate-200"
                     >
-                      <Database className="h-3 w-3 text-[#818CF8]" />
+                      <Database className="h-3 w-3 text-emerald-400" />
                       <span>{activeBaseline?.source ?? 'Google Places'}</span>
                     </span>
                   </div>
@@ -1850,14 +1867,14 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                 </div>
               </div>
 
-              {/* 3. BASELINE FACTORS BLOCK (Evidence-backed explanations tied to returned counts) */}
-              <div className="border-t border-white/[0.08] pt-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="bg-gradient-to-r from-[#A5B4FC] via-[#E879F9] to-[#FB923C] bg-clip-text font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-transparent">
-                    Baseline Factors
+              {/* SECTION C: KEY MARKET SIGNALS */}
+              <div>
+                <div className="mb-2 flex items-center justify-between border-b border-white/[0.06] pb-1.5">
+                  <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-400">
+                    Key Market Signals
                   </h3>
-                  <span className="rounded border border-[#818CF8]/30 bg-[#4F46E5]/15 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[#A5B4FC]">
-                    DATABASE
+                  <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-emerald-300">
+                    SIGNALS
                   </span>
                 </div>
 
@@ -1866,29 +1883,38 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                     data-testid="baseline-factors-list"
                     className="space-y-1.5"
                   >
-                    {factorEntries.map((factor) => (
-                      <div
-                        key={factor.key}
-                        data-testid={`baseline-factor-${factor.key}`}
-                        className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-2.5 py-1.5"
-                      >
-                        <div className="flex items-center justify-between gap-2 text-[11.5px]">
-                          <span className="font-medium text-slate-200">
-                            {factor.label}
-                          </span>
-                          <span
-                            className={`rounded border px-1.5 py-0.2 font-mono text-[9.5px] font-semibold ${
-                              CATEGORICAL_BADGE_BG[factor.item.level]
-                            }`}
+                    {factorEntries.map((factor) => {
+                      const conciseText = formatConciseSignalExplanation(
+                        factor.key,
+                        factor.item.explanation
+                      );
+                      return (
+                        <div
+                          key={factor.key}
+                          data-testid={`baseline-factor-${factor.key}`}
+                          className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-2.5 py-1.5"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-[11.5px]">
+                            <span className="font-medium text-slate-200">
+                              {factor.label}
+                            </span>
+                            <span
+                              className={`rounded border px-1.5 py-0.2 font-mono text-[9.5px] font-semibold ${
+                                CATEGORICAL_BADGE_BG[factor.item.level]
+                              }`}
+                            >
+                              {factor.item.level}
+                            </span>
+                          </div>
+                          <p
+                            className="mt-0.5 truncate text-[10.5px] leading-snug text-slate-300/85"
+                            title={conciseText}
                           >
-                            {factor.item.level}
-                          </span>
+                            {conciseText}
+                          </p>
                         </div>
-                        <p className="mt-0.5 text-[10.5px] leading-snug text-slate-400">
-                          {factor.item.explanation}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-xs leading-relaxed text-slate-300/80">
@@ -1947,7 +1973,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                 {evidenceExpanded && (
                   <div className="liquid-glass-subtle mt-2 space-y-2 rounded-xl p-3">
                     {activeBaseline && activeBaseline.places.length > 0 && (
-                      <div className="max-h-28 space-y-1 overflow-y-auto border-b border-white/[0.08] pb-2 pr-1">
+                      <div className="max-h-28 space-y-1 overflow-y-auto border-b border-white/[0.08] pb-2 pr-1.5 custom-scrollbar">
                         {activeBaseline.places.slice(0, 12).map((pl) => (
                           <div
                             key={pl.place_id}

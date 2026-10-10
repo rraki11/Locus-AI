@@ -851,7 +851,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                 fusionResult.deduplicated_entities.length > 0 ? (
                   <div
                     data-testid="deduplicated-entities-list"
-                    className="max-h-[250px] space-y-2 overflow-y-auto pr-1"
+                    className="max-h-[250px] space-y-2 overflow-y-auto pr-1.5 custom-scrollbar"
                   >
                     {fusionResult.deduplicated_entities.map((entity) => (
                       <div
@@ -1115,7 +1115,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
               {/* Reconciled Evidence Ledger */}
               <div
                 data-testid="reconciled-fusion-ledger"
-                className="max-h-[340px] space-y-2 overflow-y-auto pr-1"
+                className="max-h-[340px] space-y-2 overflow-y-auto pr-1.5 custom-scrollbar"
               >
                 {fusionResult ? (
                   filteredLedger.length > 0 ? (

@@ -8,6 +8,9 @@
     --bg-dark-canvas: #070b14;
     --accent-cyan: #38bdf8;
     --accent-emerald: #10b981;
+    --stage-scrollbar-thumb: rgba(16, 185, 129, 0.28);
+    --stage-scrollbar-thumb-hover: rgba(110, 231, 183, 0.65);
+    --stage-scrollbar-glow: rgba(16, 185, 129, 0.45);
   }
 
   html {
@@ -15,6 +18,8 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: #070b14;
     color: #f8fafc;
+    scrollbar-width: thin;
+    scrollbar-color: var(--stage-scrollbar-thumb, rgba(255, 255, 255, 0.18)) transparent;
   }
 
   body {
@@ -22,6 +27,138 @@
     overflow-x: hidden;
     background-color: #070b14;
   }
+}
+
+/* ============================================================
+   PREMIUM GLASSMORPHISM CUSTOM SCROLLBARS
+   Replaces chunky default browser scrollbars with slim,
+   translucent, theme-reactive scrollbars.
+   - Slim 5px track with rounded thumb
+   - Seamless transparent track
+   - Smooth 250ms hover glow transitions
+   - Automatic styling across all scrollable panels and containers
+   ============================================================ */
+
+/* Global document scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--stage-scrollbar-thumb, rgba(255, 255, 255, 0.16));
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background 250ms ease, box-shadow 250ms ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--stage-scrollbar-thumb-hover, rgba(255, 255, 255, 0.38));
+  box-shadow: 0 0 8px var(--stage-scrollbar-glow, rgba(16, 185, 129, 0.35));
+}
+
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Page-specific Theme Declarations */
+[data-stage-theme='emerald'] {
+  --stage-scrollbar-thumb: rgba(16, 185, 129, 0.28);
+  --stage-scrollbar-thumb-hover: rgba(110, 231, 183, 0.65);
+  --stage-scrollbar-glow: rgba(16, 185, 129, 0.45);
+}
+
+[data-stage-theme='teal'] {
+  --stage-scrollbar-thumb: rgba(20, 184, 166, 0.28);
+  --stage-scrollbar-thumb-hover: rgba(94, 234, 212, 0.65);
+  --stage-scrollbar-glow: rgba(20, 184, 166, 0.45);
+}
+
+[data-stage-theme='midnight'] {
+  --stage-scrollbar-thumb: rgba(56, 189, 248, 0.28);
+  --stage-scrollbar-thumb-hover: rgba(186, 230, 253, 0.65);
+  --stage-scrollbar-glow: rgba(56, 189, 248, 0.45);
+}
+
+[data-stage-theme='report'] {
+  --stage-scrollbar-thumb: rgba(16, 185, 129, 0.28);
+  --stage-scrollbar-thumb-hover: rgba(167, 243, 208, 0.65);
+  --stage-scrollbar-glow: rgba(16, 185, 129, 0.45);
+}
+
+/* Internal glass scrollbars for panels, modals, lists, and tables */
+.custom-scrollbar,
+.locus-scrollbar,
+[data-stage-theme] * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--stage-scrollbar-thumb, rgba(16, 185, 129, 0.28)) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar,
+.locus-scrollbar::-webkit-scrollbar,
+[data-stage-theme] *::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track,
+.locus-scrollbar::-webkit-scrollbar-track,
+[data-stage-theme] *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.locus-scrollbar::-webkit-scrollbar-thumb,
+[data-stage-theme] *::-webkit-scrollbar-thumb {
+  background: var(--stage-scrollbar-thumb, rgba(16, 185, 129, 0.28));
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background 250ms ease, box-shadow 250ms ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.locus-scrollbar::-webkit-scrollbar-thumb:hover,
+[data-stage-theme] *::-webkit-scrollbar-thumb:hover {
+  background: var(--stage-scrollbar-thumb-hover, rgba(110, 231, 183, 0.65));
+  box-shadow: 0 0 8px var(--stage-scrollbar-glow, rgba(16, 185, 129, 0.45));
+}
+
+.custom-scrollbar::-webkit-scrollbar-button,
+.locus-scrollbar::-webkit-scrollbar-button,
+[data-stage-theme] *::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner,
+.locus-scrollbar::-webkit-scrollbar-corner,
+[data-stage-theme] *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Suppress scrollbar on .no-scrollbar containers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
 /* Liquid Glass Surface Recipes */

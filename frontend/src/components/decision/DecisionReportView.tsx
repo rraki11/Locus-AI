@@ -1346,7 +1346,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
           </div>
 
           {isLedgerOpen ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full border-collapse text-left text-xs">
               <thead>
                 <tr className="border-b border-white/[0.10] font-mono text-[10px] uppercase tracking-wider text-slate-400">
