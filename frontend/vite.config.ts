@@ -1,8 +1,8 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import { createMarketBaselineMiddleware } from './server/marketBaselineApi';
-import { createStreetScanMiddleware } from './server/streetScanApi';
-import { createLocationIntelligenceMiddleware } from './server/locationIntelligenceApi';
+import { createMarketBaselineMiddleware } from '../backend/marketBaselineApi';
+import { createStreetScanMiddleware } from '../backend/streetScanApi';
+import { createLocationIntelligenceMiddleware } from '../backend/locationIntelligenceApi';
 
 export default defineConfig(({ mode }) => {
   const rootCwd = (globalThis as any).process?.cwd?.() || '.';

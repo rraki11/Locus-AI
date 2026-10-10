@@ -14,7 +14,7 @@
   },
   "include": [
     "vite.config.ts",
-    "server/**/*.ts",
+    "../backend/**/*.ts",
     "src/types/**/*.ts",
     "src/data/marketDiscoveryData.ts",
     "src/utils/locationIntelligenceEngine.ts"

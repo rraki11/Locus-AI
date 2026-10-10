@@ -2,7 +2,7 @@ import { NodeHttpRequest, NodeHttpResponse } from './marketBaselineApi';
 import {
   BASELINE_SCENARIO_ASSUMPTIONS,
   compareBaselineAndScenarioIntelligence,
-} from '../src/utils/locationIntelligenceEngine';
+} from '../frontend/src/utils/locationIntelligenceEngine';
 
 function sendJson(res: NodeHttpResponse, status: number, payload: unknown): void {
   res.statusCode = status;
