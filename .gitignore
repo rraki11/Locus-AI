@@ -16,4 +16,7 @@ frontend/.env.local
 frontend/.env.*.local
 .DS_Store
 Thumbs.db
+# Tesseract OCR downloaded models
+frontend/public/tessdata/
+*.traineddata*
 scratch/

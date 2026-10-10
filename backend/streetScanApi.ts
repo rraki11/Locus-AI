@@ -195,83 +195,115 @@ const GENERIC_CATEGORY_TOKENS = new Set([
 
 /**
  * Normalizes raw OCR signboard text:
- * - lowercases
- * - strips noisy punctuation/symbols
+ * - lowercases (locale-aware, safe for non-Latin scripts)
+ * - strips control/noise characters but preserves Unicode letters (Telugu, Devanagari, etc.)
  * - collapses whitespace
+ *
+ * Note: the original [^a-z0-9…] replacement has been replaced with a
+ * Unicode-property class so Telugu and other non-Latin scripts are not erased.
  */
 export function normalizeOcrText(raw: string): string {
   return raw
-    .toLowerCase()
     .replace(/[\r\n\t]+/g, ' ')
-    .replace(/[^a-z0-9&'\-\s]/g, ' ')
+    // Strip chars that are not Unicode letters, digits, &, ', - or space
+    .replace(/[^\p{L}\p{N}&'\-\s]/gu, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .toLocaleLowerCase();
 }
 
 /**
  * Formats a normalized OCR string into clean Title Case for UI display if the raw string is all-caps or noisy.
+ * Preserves mixed-script names (Telugu + Latin) by testing for any mixed-case Latin presence OR
+ * non-Latin Unicode letters.
  */
 function formatCleanDisplayName(raw: string, normalized: string): string {
   const trimmedRaw = raw
     .replace(/[\r\n\t]+/g, ' ')
-    .replace(/[^A-Za-z0-9&'\-.\s]/g, ' ')
+    .replace(/[^\p{L}\p{N}&'\-.\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
+  // If the raw text contains any non-Latin Unicode letters (e.g. Telugu), preserve it as-is
+  // so the script characters aren't mangled by Title Case splitting.
+  const hasNonLatinScript = /[^\u0000-\u024F]/u.test(trimmedRaw);
+  if (hasNonLatinScript) {
+    return trimmedRaw.length >= 2 ? trimmedRaw : normalized;
+  }
+
+  // For Latin text: preserve if already mixed-case (looks intentional)
   if (trimmedRaw.length >= 3 && /[a-z]/.test(trimmedRaw) && /[A-Z]/.test(trimmedRaw)) {
     return trimmedRaw;
   }
 
+  // Otherwise Title Case the normalized form
   return normalized
     .split(' ')
     .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => word.charAt(0).toLocaleUpperCase() + word.slice(1))
     .join(' ');
 }
 
 /**
  * Filters out obvious OCR noise, license plates, phone numbers, and non-storefront street signs.
+ *
+ * Unicode-safe: does NOT require Latin characters or Latin vowels. Valid Telugu,
+ * Devanagari, or other Indic script text must not be rejected solely because it
+ * lacks [aeiouy] or [a-z].
+ *
+ * Confidence sentinel: when the client sends confidence = 0, that means the OCR
+ * engine returned no usable confidence value ("Confidence unavailable"). We
+ * accept those reads at a neutral threshold rather than hard-rejecting them,
+ * since the text content may still be genuine — the filtering below catches actual
+ * noise independently.
  */
 export function isPlausibleStorefrontOcr(
   rawText: string,
   normalizedText: string,
   confidence: number
 ): boolean {
-  if (!normalizedText || normalizedText.length < 3 || normalizedText.length > 56) {
-    return false;
-  }
-  if (confidence < 0.48) {
+  if (!normalizedText || normalizedText.length < 3 || normalizedText.length > 96) {
     return false;
   }
 
-  // Reject Indian vehicle registration plate patterns (e.g. TS 09 AB 1234, KA01MJ2021)
+  // confidence === 0 is the "unavailable" sentinel from the pipeline client.
+  // Reject reads with a genuinely low but non-zero confidence (< 0.28).
+  if (confidence > 0 && confidence < 0.28) {
+    return false;
+  }
+
+  // Reject Indian vehicle registration plate patterns (e.g. TS09AB1234)
   const compact = normalizedText.replace(/\s+/g, '');
   if (/^[a-z]{2}\d{1,2}[a-z]{1,3}\d{3,4}$/i.test(compact)) {
     return false;
   }
 
   // Reject phone numbers / pure digits / price tags
-  const alphaCount = (normalizedText.match(/[a-z]/g) || []).length;
+  // Use Unicode letter count so non-Latin scripts contribute to this check.
+  const letterCount = (normalizedText.match(/\p{L}/gu) || []).length;
   const digitCount = (normalizedText.match(/\d/g) || []).length;
-  if (alphaCount < 3 || digitCount > alphaCount) {
+  if (letterCount < 2 || digitCount > letterCount * 2) {
     return false;
   }
 
   // Reject single-character repeated OCR artifacts (e.g. "iii", "lll", "eee")
-  if (/^([a-z])\1{2,}$/.test(compact)) {
+  if (/^(.)\1{2,}$/.test(compact)) {
     return false;
   }
 
-  // Reject known non-business traffic/door phrases
+  // Reject known non-business traffic/door phrases (these are Latin so the set still applies)
   if (NON_BUSINESS_STOP_PHRASES.has(normalizedText)) {
     return false;
   }
 
-  // Ensure at least one word has >= 3 letters with a vowel (filters random consonant OCR noise)
+  // Ensure at least one word has >= 2 Unicode letter codepoints.
+  // This replaces the old /[aeiouy]/ Latin-vowel check which would reject all
+  // Telugu text. A word with 2+ letters in any script is considered readable.
   const words = normalizedText.split(' ').filter(Boolean);
-  const hasReadableWord = words.some(
-    (w) => w.length >= 3 && /[aeiouy]/.test(w)
-  );
+  const hasReadableWord = words.some((w) => {
+    const wLetters = (w.match(/\p{L}/gu) || []).length;
+    return wLetters >= 2;
+  });
   if (!hasReadableWord) {
     return false;
   }
@@ -428,8 +460,18 @@ export function deduplicateOcrObservations(
 
   for (const frame of sortedFrames) {
     for (const read of frame.ocr_reads || []) {
-      const norm = normalizeOcrText(read.normalized_text || read.raw_text || '');
-      const conf = Number.isFinite(read.confidence) ? read.confidence : 0.65;
+      const conf = Number.isFinite(read.confidence) ? read.confidence : 0;
+
+      // confidence === 0 is the "unavailable" sentinel from the client pipeline.
+      // Reads with unavailable confidence should still be evaluated on their text,
+      // UNLESS the normalized text is the OCR language-warning diagnostic itself
+      // (which should never appear in the evidence list).
+      const normCheck = normalizeOcrText(read.normalized_text || read.raw_text || '');
+      if (normCheck.startsWith('ocr lang warning')) {
+        continue;
+      }
+
+      const norm = normCheck;
 
       if (!isPlausibleStorefrontOcr(read.raw_text, norm, conf)) {
         continue;

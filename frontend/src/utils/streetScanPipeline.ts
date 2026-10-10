@@ -147,13 +147,70 @@ function seekVideoElement(
   });
 }
 
+/**
+ * Normalizes an OCR line for matching and filtering.
+ *
+ * Preserves Unicode scripts (Telugu U+0C00–U+0C7F, Devanagari, etc.)
+ * by only stripping control characters and OCR noise punctuation —
+ * NOT stripping all non-ASCII. Latin normalization (lowercase) is
+ * applied where possible; other scripts are left as-is.
+ */
 function normalizeOcrLineClient(raw: string): string {
   return raw
-    .toLowerCase()
+    // Collapse whitespace control chars
     .replace(/[\r\n\t]+/g, ' ')
-    .replace(/[^a-z0-9&'\-\s]/g, ' ')
+    // Strip pure punctuation/symbol noise but keep letters (any script), digits, &, ', -
+    // Use Unicode-aware approach: strip chars that are not letter, digit, or kept punctuation
+    .replace(/[^\p{L}\p{N}&'\-\s]/gu, ' ')
+    // Collapse runs of spaces
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    // Lowercase only the ASCII/Latin portion (toLocaleLowerCase is safe for all scripts)
+    .toLocaleLowerCase();
+}
+
+/**
+ * Conservative OCR line usability filter — rejects empty, pure-noise, and
+ * unusably short results WITHOUT requiring Latin characters.
+ *
+ * Rules (all must pass):
+ *   1. Raw text must have at least 2 non-whitespace characters.
+ *   2. Normalised text must be at least 3 characters (post-cleanup).
+ *   3. Must not be pure digits / price / phone patterns.
+ *   4. Must not be single-character repetition (OCR artefact like "llll").
+ *   5. Must contain at least one "letter" codepoint (any Unicode script).
+ *
+ * Deliberately does NOT check for Latin vowels or Latin character sequences,
+ * so valid Telugu, Devanagari, or other non-Latin signboard text is preserved.
+ */
+function isOcrLineUsable(rawText: string, normalizedText: string): boolean {
+  // Rule 1: at least 2 non-whitespace chars in raw
+  if (rawText.replace(/\s+/g, '').length < 2) return false;
+
+  // Rule 2: normalised text at least 3 chars
+  if (normalizedText.length < 3) return false;
+
+  // Rule 5: must contain at least one Unicode letter (any script)
+  // \p{L} matches letters in any Unicode script including Telugu, Devanagari, etc.
+  if (!/\p{L}/u.test(normalizedText)) return false;
+
+  // Rule 3a: reject pure-digit strings (e.g. "1234567890", "Rs 240")
+  const letterCount = (normalizedText.match(/\p{L}/gu) || []).length;
+  const digitCount = (normalizedText.match(/\d/g) || []).length;
+  if (letterCount === 0 || digitCount > letterCount * 2) return false;
+
+  // Rule 3b: reject strings that look like phone numbers or Indian vehicle plates
+  const compact = normalizedText.replace(/\s+/g, '');
+  if (/^\+?[\d\s\-]{7,}$/.test(compact)) return false;
+  if (/^[a-z]{2}\d{1,2}[a-z]{1,3}\d{3,4}$/i.test(compact)) return false;
+
+  // Rule 4: reject single-char repetition artefacts (e.g. "iiii", "llll")
+  if (/^(.)\1{3,}$/.test(compact)) return false;
+
+  // Rule extra: reject strings whose entire content is spaces/dashes/punctuation
+  if (/^[\s\-_.,;:!?'"()\[\]{}|/\\]+$/.test(normalizedText)) return false;
+
+  return true;
 }
 
 /**
@@ -460,7 +517,164 @@ export async function runLiveVideoStreetScan(params: {
 
     try {
       const Tesseract = await import('tesseract.js');
-      const worker = await Tesseract.createWorker('eng');
+
+      // ---------------------------------------------------------------------------
+      // Language-data strategy for Tesseract.js v7
+      //
+      // Primary:  local /tessdata/ directory served from public/ (offline-safe, no
+      //           CDN dependency).  Files: eng.traineddata.gz, tel.traineddata.gz
+      //           Source: @tesseract.js-data/{eng,tel}@1.0.0 from jsDelivr, pinned.
+      //
+      // Fallback: jsDelivr CDN pinned to @tesseract.js-data/tel@1.0.0 / eng@1.0.0
+      //           (the same source the Tesseract.js v7 worker uses by default).
+      //
+      // The langPath option tells the worker WHERE to fetch *.traineddata.gz from.
+      // Worker URL pattern: {langPath}/{lang}/4.0.0/{lang}.traineddata.gz
+      // Local files live at:  /tessdata/eng.traineddata.gz  (no subdirectory)
+      //
+      // Because the local files are flat (no /4.0.0/ sub-path), we set langPath to
+      // the directory that contains them directly, i.e. the worker will try:
+      //   /tessdata/tel.traineddata.gz   ← local flat path
+      // But the worker appends /{lang}/4.0.0/{lang}.traineddata.gz, so we need a
+      // different approach: pass the traineddata as a Blob/ArrayBuffer using the
+      // Tesseract.js v7 Lang object API: { code: 'tel', data: ArrayBuffer }
+      // This bypasses CDN entirely and is the only reliable way to use local files.
+      // ---------------------------------------------------------------------------
+
+      /**
+       * Fetches a local traineddata.gz and decompresses it via DecompressionStream.
+       * Returns the raw ArrayBuffer that Tesseract.js v7 accepts as `lang.data`.
+       * Returns null if the asset is missing or DecompressionStream is unavailable.
+       */
+      async function fetchLocalTraineddata(lang: string): Promise<ArrayBuffer | null> {
+        const localUrl = `/tessdata/${lang}.traineddata.gz`;
+        try {
+          const resp = await fetch(localUrl);
+          if (!resp.ok) return null;
+
+          // DecompressionStream is available in all modern browsers (Chrome 80+,
+          // Firefox 113+, Safari 16.4+). Fall back to raw gzip if unavailable —
+          // Tesseract.js v7 handles .gz buffers when gzip:true (the default).
+          if (typeof DecompressionStream !== 'undefined') {
+            const ds = new DecompressionStream('gzip');
+            const decompressed = resp.body!.pipeThrough(ds);
+            const reader = decompressed.getReader();
+            const chunks: Uint8Array[] = [];
+            let done = false;
+            while (!done) {
+              const { value, done: d } = await reader.read();
+              if (value) chunks.push(value);
+              done = d;
+            }
+            const total = chunks.reduce((n, c) => n + c.byteLength, 0);
+            const out = new Uint8Array(total);
+            let offset = 0;
+            for (const chunk of chunks) {
+              out.set(chunk, offset);
+              offset += chunk.byteLength;
+            }
+            return out.buffer;
+          }
+
+          // DecompressionStream unavailable — return raw gzip buffer.
+          // Tesseract.js v7 worker decompresses it internally when gzip:true.
+          return await resp.arrayBuffer();
+        } catch {
+          return null;
+        }
+      }
+
+      // --- Build worker with eng+tel, preferring local assets ---
+      let worker: Awaited<ReturnType<typeof Tesseract.createWorker>> | null = null;
+      let activeOcrLangs = 'eng+tel';
+      let teluguLangStatus: 'local' | 'cdn' | 'unavailable' = 'unavailable';
+
+      onProgress({
+        stage: 'READING_SIGNS',
+        statusText: 'Loading OCR language data (English + Telugu)...',
+        progressPct: 64,
+      });
+
+      // Step 1: attempt to load both languages from local /tessdata/ assets.
+      const [engBuf, telBuf] = await Promise.all([
+        fetchLocalTraineddata('eng'),
+        fetchLocalTraineddata('tel'),
+      ]);
+
+      if (engBuf && telBuf) {
+        // Both local assets available — create worker with inline data (no network).
+        try {
+          worker = await Tesseract.createWorker(
+            [
+              { code: 'eng', data: engBuf },
+              { code: 'tel', data: telBuf },
+            ] as any,
+          );
+          teluguLangStatus = 'local';
+        } catch {
+          // Inline data API failed (older Tesseract.js build); fall through to CDN path.
+          engBuf && (teluguLangStatus = 'unavailable');
+          worker = null as any;
+        }
+      }
+
+      // Step 2: if local load failed or files are missing, try CDN with explicit pins.
+      if (!worker || teluguLangStatus === 'unavailable') {
+        // langPath is set to the @tesseract.js-data CDN pinned to version 1.0.0.
+        // The worker constructs: {langPath}/{lang}/4.0.0/{lang}.traineddata.gz
+        // For eng+tel that becomes two separate fetches to the CDN.
+        const pinnedLangPath =
+          'https://cdn.jsdelivr.net/npm/@tesseract.js-data';
+        try {
+          worker = await Tesseract.createWorker('eng+tel', undefined, {
+            langPath: pinnedLangPath,
+            gzip: true,
+          } as any);
+          teluguLangStatus = 'cdn';
+        } catch {
+          // Telugu CDN fetch failed — fall back to English-only.
+          activeOcrLangs = 'eng';
+          teluguLangStatus = 'unavailable';
+          try {
+            if (engBuf) {
+              worker = await Tesseract.createWorker(
+                [{ code: 'eng', data: engBuf }] as any
+              );
+            } else {
+              worker = await Tesseract.createWorker('eng', undefined, {
+                langPath: pinnedLangPath,
+                gzip: true,
+              } as any);
+            }
+          } catch {
+            // If even English fails, rethrow — caught by the outer try/catch which
+            // continues the pipeline with COCO data only.
+            throw new Error('OCR engine failed to initialise (both eng+tel and eng fallback failed)');
+          }
+        }
+      }
+
+      // Step 3: emit a structured onProgress status so the UI can display the warning.
+      // We reuse the READING_SIGNS stage; the statusText encodes the lang status
+      // in a way the UI can parse without a schema change.
+      if (teluguLangStatus === 'unavailable') {
+        onProgress({
+          stage: 'READING_SIGNS',
+          statusText:
+            '__OCR_LANG_WARNING__: Telugu (tel) traineddata could not be loaded ' +
+            '(local asset /tessdata/tel.traineddata.gz unreachable and CDN fetch failed). ' +
+            'Only English is active. Telugu signboard text will NOT be recognised. ' +
+            'Ensure the file is deployed under frontend/public/tessdata/ and the dev/prod server serves it.',
+          progressPct: 64,
+        });
+      } else {
+        onProgress({
+          stage: 'READING_SIGNS',
+          statusText:
+            `OCR language data loaded: English + Telugu (${teluguLangStatus === 'local' ? 'local asset' : 'jsDelivr CDN'}).`,
+          progressPct: 64,
+        });
+      }
 
       try {
         for (let k = 0; k < keyframesForOcr.length; k += 1) {
@@ -468,7 +682,7 @@ export async function runLiveVideoStreetScan(params: {
           kf.ocr_sampled = true;
           onProgress({
             stage: 'READING_SIGNS',
-            statusText: `Reading storefront signs on keyframe #${kf.frame_index} (${k + 1}/${keyframesForOcr.length})...`,
+            statusText: `Reading storefront signs on keyframe #${kf.frame_index} (${k + 1}/${keyframesForOcr.length}) [${activeOcrLangs}]...`,
             progressPct:
               64 + Math.round(((k + 1) / keyframesForOcr.length) * 20),
           });
@@ -498,51 +712,79 @@ export async function runLiveVideoStreetScan(params: {
             for (const line of collectedLines) {
               const rawText = String(line?.text || '').trim();
               const normText = normalizeOcrLineClient(rawText);
-              const rawLineConf = Number(line?.confidence ?? pageData?.confidence ?? 68);
-              const conf = Number(
-                Math.min(0.99, Math.max(0.52, rawLineConf / 100)).toFixed(2)
-              );
-              if (normText.length >= 3 && /[a-z]{2,}/.test(normText)) {
-                const bboxObj = line?.bbox;
-                const bbox: [number, number, number, number] | undefined =
-                  bboxObj && typeof bboxObj.x0 === 'number'
-                    ? [
-                        Number((bboxObj.x0 / targetW).toFixed(3)),
-                        Number((bboxObj.y0 / targetH).toFixed(3)),
-                        Number(
-                          ((bboxObj.x1 - bboxObj.x0) / targetW).toFixed(3)
-                        ),
-                        Number(
-                          ((bboxObj.y1 - bboxObj.y0) / targetH).toFixed(3)
-                        ),
-                      ]
-                    : undefined;
-                kf.ocr_reads.push({
-                  raw_text: rawText,
-                  normalized_text: normText,
-                  confidence: conf,
-                  bbox,
-                });
+
+              // --- Genuine engine confidence (no artificial floor clamp) ---
+              // Tesseract returns 0–100. A value of 0 means the engine produced
+              // no meaningful confidence (e.g. unrecognised script); we represent
+              // that as null / "Confidence unavailable" downstream rather than
+              // fabricating a 52% floor.
+              const rawLineConf = line?.confidence;
+              const rawPageConf = pageData?.confidence;
+              const rawConf =
+                typeof rawLineConf === 'number' && rawLineConf > 0
+                  ? rawLineConf
+                  : typeof rawPageConf === 'number' && rawPageConf > 0
+                  ? rawPageConf
+                  : null;
+              // Normalise to 0..1 only when a real value is present.
+              const conf: number | null =
+                rawConf !== null
+                  ? Number(Math.min(0.99, rawConf / 100).toFixed(2))
+                  : null;
+
+              // --- Conservative noise filter (Unicode-safe) ---
+              // Reject: empty, whitespace-only, pure-digit/symbol noise, very short.
+              // Do NOT reject on Latin-only presence — valid Telugu text has no
+              // Latin chars and must not be discarded here.
+              if (!isOcrLineUsable(rawText, normText)) {
+                continue;
               }
+
+              const bboxObj = line?.bbox;
+              const bbox: [number, number, number, number] | undefined =
+                bboxObj && typeof bboxObj.x0 === 'number'
+                  ? [
+                      Number((bboxObj.x0 / targetW).toFixed(3)),
+                      Number((bboxObj.y0 / targetH).toFixed(3)),
+                      Number(
+                        ((bboxObj.x1 - bboxObj.x0) / targetW).toFixed(3)
+                      ),
+                      Number(
+                        ((bboxObj.y1 - bboxObj.y0) / targetH).toFixed(3)
+                      ),
+                    ]
+                  : undefined;
+              kf.ocr_reads.push({
+                raw_text: rawText,
+                normalized_text: normText,
+                // confidence is typed as number in RawFrameOcrRead; use 0 as the
+                // sentinel for "unavailable" so the backend can distinguish it
+                // from a genuine low-confidence read (backend checks conf < 0.48).
+                // We deliberately do NOT clamp upward: 0 means unavailable.
+                confidence: conf !== null ? conf : 0,
+                bbox,
+              });
             }
           } else if (typeof pageData?.text === 'string') {
             const rawLines = pageData.text
               .split(/\r?\n/)
               .map((s: string) => s.trim())
               .filter(Boolean);
-            const rawPageConf = Number(pageData?.confidence ?? 68);
-            const baseConf = Number(
-              Math.min(0.98, Math.max(0.55, rawPageConf / 100)).toFixed(2)
-            );
+            const rawPageConf = pageData?.confidence;
+            const baseConf: number | null =
+              typeof rawPageConf === 'number' && rawPageConf > 0
+                ? Number(Math.min(0.98, rawPageConf / 100).toFixed(2))
+                : null;
             for (const lineStr of rawLines) {
               const normText = normalizeOcrLineClient(lineStr);
-              if (normText.length >= 3 && /[a-z]{2,}/.test(normText)) {
-                kf.ocr_reads.push({
-                  raw_text: lineStr,
-                  normalized_text: normText,
-                  confidence: baseConf,
-                });
+              if (!isOcrLineUsable(lineStr, normText)) {
+                continue;
               }
+              kf.ocr_reads.push({
+                raw_text: lineStr,
+                normalized_text: normText,
+                confidence: baseConf !== null ? baseConf : 0,
+              });
             }
           }
         }

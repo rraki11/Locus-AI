@@ -31,6 +31,14 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       host: true,
+      watch: {
+        ignored: [
+          '**/public/tessdata/**',
+          '**/*.traineddata.gz',
+          '**/node_modules/**',
+          '**/.git/**',
+        ],
+      },
     },
     build: {
       target: 'esnext',

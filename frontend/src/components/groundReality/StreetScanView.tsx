@@ -872,7 +872,10 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                             </div>
                             <p className="mt-0.5 font-mono text-[10.5px] text-slate-400">
                               Source: {entity.source} ({entity.detector_label}) ·
-                              Confidence: {Math.round(entity.confidence * 100)}%
+                              Confidence:{' '}
+                              {entity.confidence > 0
+                                ? `${Math.round(entity.confidence * 100)}%`
+                                : 'Unavailable'}
                             </p>
                           </div>
 
@@ -1140,7 +1143,10 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                                 </span>
                                 <span>·</span>
                                 <span>
-                                  Conf: {Math.round(item.confidence * 100)}%
+                                  Conf:{' '}
+                                  {item.confidence > 0
+                                    ? `${Math.round(item.confidence * 100)}%`
+                                    : 'Unavailable'}
                                 </span>
                                 {typeof item.distance_m === 'number' && (
                                   <>
