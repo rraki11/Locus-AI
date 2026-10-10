@@ -91,7 +91,7 @@ export function evaluateLocationIntelligence(params: {
 
   const streetScanStatus = !streetScanFusion
     ? 'STREET_SCAN_NOT_AVAILABLE'
-    : streetScanFusion.scan_mode === 'LIVE_UPLOAD'
+    : streetScanFusion.scan_mode === 'LIVE_UPLOAD' || streetScanFusion.scan_mode === 'PHOTO_BATCH'
     ? 'LIVE_STREET_SCAN_FUSED'
     : 'CALIBRATED_DEMO_SCAN_FUSED';
 
@@ -316,12 +316,14 @@ export function evaluateLocationIntelligence(params: {
       groundEvidenceRating = 'MEDIUM';
     }
     groundEvidenceExplanation = `${
-      streetScanFusion.scan_mode === 'LIVE_UPLOAD'
+      streetScanFusion.scan_mode === 'PHOTO_BATCH'
+        ? `Live photo batch Street Scan (${streetScanFusion.video_summary.frames_extracted} photos)`
+        : streetScanFusion.scan_mode === 'LIVE_UPLOAD'
         ? 'Live video Street Scan'
         : 'Calibrated Demo Street Scan'
     } analyzed ${
       streetScanFusion.video_summary.frames_extracted
-    } frames (${
+    } ${streetScanFusion.scan_mode === 'PHOTO_BATCH' ? 'photos' : 'frames'} (${
       streetScanFusion.video_summary.ocr_keyframes_count
     } OCR keyframes): confirmed ${observedEntitiesTotal} deduplicated entities (${matched300m} matched to baseline, +${observedAdditional300m} additional observed signals).`;
     groundSupporting.push(

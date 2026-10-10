@@ -171,6 +171,8 @@ export function buildMarketEntryReport(
           status_badge:
             streetScanFusion.scan_mode === 'LIVE_UPLOAD'
               ? 'LIVE STREET SCAN EXECUTED'
+              : streetScanFusion.scan_mode === 'PHOTO_BATCH'
+              ? 'PHOTO BATCH SCAN EXECUTED'
               : 'CALIBRATED DEMO SCAN EXECUTED',
           corridor_scope_statement:
             'The Street Scan represents only the physical corridor captured in the uploaded footage.',
@@ -769,6 +771,8 @@ export function buildMarketEntryReport(
   const streetVisualLabel = streetScanExecuted
     ? streetScanFusion?.scan_mode === 'LIVE_UPLOAD'
       ? 'Live street video analyzed'
+      : streetScanFusion?.scan_mode === 'PHOTO_BATCH'
+      ? 'Live photo batch analyzed'
       : 'Calibrated scan telemetry'
     : 'Not provided (optional enhancement)';
 

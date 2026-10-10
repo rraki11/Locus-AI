@@ -158,6 +158,7 @@ export interface MarketEntryReportData {
     executed: boolean;
     status_badge:
       | 'LIVE STREET SCAN EXECUTED'
+      | 'PHOTO BATCH SCAN EXECUTED'
       | 'CALIBRATED DEMO SCAN EXECUTED'
       | 'DATABASE BASELINE ONLY'
       | 'MAP-BASED BASELINE';

@@ -7,6 +7,14 @@ import {
   StreetScanFusionResponse,
   StreetScanPipelineStage,
 } from '../types/streetScan';
+import {
+  extractHighResCrop,
+  generateDefaultSignboardCrops,
+  generatePreprocessingVariants,
+  PreprocessedCropResult,
+  scoreOcrRead,
+  cleanOcrText,
+} from './signboardOcrEngine';
 
 export interface SampledFramePreview {
   frame_index: number;
@@ -14,6 +22,8 @@ export interface SampledFramePreview {
   sharpness_score: number;
   ocr_sampled: boolean;
   preview_data_url: string;
+  original_data_url?: string;
+  winning_variant?: string;
   objects: RawCocoObjectDetection[];
   ocr_reads: RawFrameOcrRead[];
 }
@@ -22,7 +32,130 @@ export interface StreetScanProgressUpdate {
   stage: StreetScanPipelineStage;
   statusText: string;
   progressPct: number;
+  /** When set, the OCR language data failed to load for this language. The UI should surface this prominently. */
+  ocrLangWarning?: string;
 }
+
+export type OcrSupportTier = 'LOCAL_VERIFIED' | 'EXPERIMENTAL_CDN';
+
+export interface OcrLanguageConfig {
+  code: string;
+  label: string;
+  script: string;
+  tier: OcrSupportTier;
+  isLocal: boolean;
+  notes: string;
+}
+
+export const LOCAL_LANG_CODES = new Set(['eng', 'hin', 'kan', 'tam', 'tel']);
+
+/**
+ * Configuration for supported OCR language packs.
+ * English, Hindi, Kannada, Tamil, and Telugu are verified and hosted locally in /tessdata/
+ * for instant offline recognition without network dependencies.
+ * Additional Indic and global languages can be loaded on-demand via Tesseract's CDN repository.
+ */
+export const SUPPORTED_OCR_LANGUAGES: OcrLanguageConfig[] = [
+  // Multilingual Bilingual Combinations (Standard Commercial Signboards)
+  {
+    code: 'eng+hin',
+    label: 'English + Hindi (Bilingual)',
+    script: 'Latin & Devanagari',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Local neural models for North/Central India & metropolitan bilingual signage.',
+  },
+  {
+    code: 'eng+kan',
+    label: 'English + Kannada (Bilingual)',
+    script: 'Latin & Kannada',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Local neural models for Bangalore / Karnataka commercial corridors.',
+  },
+  {
+    code: 'eng+tam',
+    label: 'English + Tamil (Bilingual)',
+    script: 'Latin & Tamil',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Local neural models for Chennai / Tamil Nadu commercial corridors.',
+  },
+  {
+    code: 'eng+tel',
+    label: 'English + Telugu (Bilingual)',
+    script: 'Latin & Telugu',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Local neural models for Hyderabad / Andhra Pradesh / Telangana corridors.',
+  },
+  // Single Language Regional Models
+  {
+    code: 'eng',
+    label: 'English Only',
+    script: 'Latin',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Fast local model for high-traffic commercial signboards.',
+  },
+  {
+    code: 'hin',
+    label: 'Hindi Only (हिन्दी)',
+    script: 'Devanagari',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Local Devanagari model for regional storefronts and retail signage.',
+  },
+  {
+    code: 'kan',
+    label: 'Kannada Only (ಕನ್ನಡ)',
+    script: 'Kannada',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Local Kannada model for regional commercial signage.',
+  },
+  {
+    code: 'tam',
+    label: 'Tamil Only (தமிழ்)',
+    script: 'Tamil',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Local Tamil model for regional commercial signage.',
+  },
+  {
+    code: 'tel',
+    label: 'Telugu Only (తెలుగు)',
+    script: 'Telugu',
+    tier: 'LOCAL_VERIFIED',
+    isLocal: true,
+    notes: 'Local Telugu model for regional commercial signage.',
+  },
+  // Experimental / On-Demand CDN Languages
+  {
+    code: 'eng+mar',
+    label: 'English + Marathi (Experimental)',
+    script: 'Latin & Devanagari (Marathi)',
+    tier: 'EXPERIMENTAL_CDN',
+    isLocal: false,
+    notes: 'On-demand CDN download for Maharashtra / Mumbai corridors.',
+  },
+  {
+    code: 'eng+guj',
+    label: 'English + Gujarati (Experimental)',
+    script: 'Latin & Gujarati',
+    tier: 'EXPERIMENTAL_CDN',
+    isLocal: false,
+    notes: 'On-demand CDN download for Gujarat corridors.',
+  },
+  {
+    code: 'eng+ben',
+    label: 'English + Bengali (Experimental)',
+    script: 'Latin & Bengali',
+    tier: 'EXPERIMENTAL_CDN',
+    isLocal: false,
+    notes: 'On-demand CDN download for West Bengal / Kolkata corridors.',
+  },
+];
 
 const RELEVANT_COCO_CLASSES = new Set([
   'person',
@@ -121,19 +254,31 @@ function seekVideoElement(
   video: HTMLVideoElement,
   timeSec: number
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    let resolved = false;
     const timeout = window.setTimeout(() => {
-      cleanup();
-      resolve();
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        console.warn(`[StreetScan] Seek timeout at ${timeSec.toFixed(2)}s; continuing extraction.`);
+        resolve();
+      }
     }, 2500);
 
     const onSeeked = () => {
-      cleanup();
-      resolve();
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve();
+      }
     };
     const onError = () => {
-      cleanup();
-      reject(new Error('Video seek failed'));
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        console.warn(`[StreetScan] Video error during seek at ${timeSec.toFixed(2)}s; continuing.`);
+        resolve();
+      }
     };
     const cleanup = () => {
       window.clearTimeout(timeout);
@@ -143,7 +288,16 @@ function seekVideoElement(
 
     video.addEventListener('seeked', onSeeked, { once: true });
     video.addEventListener('error', onError, { once: true });
-    video.currentTime = timeSec;
+    try {
+      video.currentTime = timeSec;
+    } catch (err) {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        console.warn(`[StreetScan] video.currentTime assignment failed:`, err);
+        resolve();
+      }
+    }
   });
 }
 
@@ -155,7 +309,7 @@ function seekVideoElement(
  * NOT stripping all non-ASCII. Latin normalization (lowercase) is
  * applied where possible; other scripts are left as-is.
  */
-function normalizeOcrLineClient(raw: string): string {
+export function normalizeOcrLineClient(raw: string): string {
   return raw
     // Collapse whitespace control chars
     .replace(/[\r\n\t]+/g, ' ')
@@ -267,6 +421,135 @@ function selectHighValueOcrFrameIndices(
   return selectedIndices;
 }
 
+export interface InitializedOcrWorker {
+  worker: any;
+  activeLangs: string;
+  sourceMode: 'local' | 'cdn' | 'fallback_eng';
+  langWarning?: string;
+}
+
+/**
+ * Initializes a language-independent Tesseract worker with local offline priority,
+ * on-demand CDN fallback, and graceful English fallback.
+ */
+export async function initMultilingualTesseractWorker(
+  selectedLangCode: string,
+  timeoutMs = 15000
+): Promise<InitializedOcrWorker> {
+  const Tesseract = await import('tesseract.js');
+
+  function createWithTimeout(
+    langs: string,
+    oem: any,
+    options: any,
+    ms: number
+  ): Promise<Awaited<ReturnType<typeof Tesseract.createWorker>>> {
+    return Promise.race([
+      Tesseract.createWorker(langs, oem, options),
+      new Promise<never>((_, reject) =>
+        window.setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Tesseract worker initialization timed out after ${ms}ms`
+              )
+            ),
+          ms
+        )
+      ),
+    ]);
+  }
+
+  const subLangs = selectedLangCode.split('+');
+  const allSubLangsLocal = subLangs.every((code) => LOCAL_LANG_CODES.has(code));
+
+  let worker: any = null;
+  let sourceMode: 'local' | 'cdn' | 'fallback_eng' = 'local';
+  let activeLangs = selectedLangCode;
+  let langWarning: string | undefined = undefined;
+
+  // Attempt 1: Load from local /tessdata if all sub-languages are present
+  if (allSubLangsLocal) {
+    try {
+      worker = await createWithTimeout(
+        selectedLangCode,
+        undefined,
+        {
+          langPath: '/tessdata',
+          gzip: true,
+        },
+        timeoutMs
+      );
+      sourceMode = 'local';
+    } catch (errLocal) {
+      console.warn(
+        `[StreetScan OCR] Local /tessdata load failed for "${selectedLangCode}":`,
+        errLocal
+      );
+      worker = null;
+    }
+  }
+
+  // Attempt 2: Load from default CDN
+  if (!worker) {
+    try {
+      worker = await createWithTimeout(
+        selectedLangCode,
+        undefined,
+        {
+          gzip: true,
+        },
+        timeoutMs + 4000
+      );
+      sourceMode = 'cdn';
+    } catch (errCdn) {
+      console.warn(
+        `[StreetScan OCR] CDN load failed for "${selectedLangCode}":`,
+        errCdn
+      );
+      worker = null;
+    }
+  }
+
+  // Attempt 3: Graceful fallback to English-only
+  if (!worker) {
+    activeLangs = 'eng';
+    sourceMode = 'fallback_eng';
+    langWarning = `Language pack "${selectedLangCode}" could not be loaded from local storage or CDN. Operating in English (eng) fallback mode.`;
+
+    try {
+      worker = await createWithTimeout(
+        'eng',
+        undefined,
+        {
+          langPath: '/tessdata',
+          gzip: true,
+        },
+        8000
+      );
+    } catch {
+      worker = await createWithTimeout(
+        'eng',
+        undefined,
+        { gzip: true },
+        10000
+      );
+    }
+  }
+
+  // Set PSM 6 (single uniform text block) and preserve whitespace
+  try {
+    await worker.setParameters({
+      tessedit_pageseg_mode: 6 as any,
+      preserve_interword_spaces: '1',
+    });
+  } catch {
+    // Keep default parameters if setParameters fails
+  }
+
+  return { worker, activeLangs, sourceMode, langWarning };
+}
+
 /**
  * Runs the end-to-end Live Video Street Scan pipeline in the browser and fuses via /api/street-scan/fuse.
  */
@@ -283,6 +566,7 @@ export async function runLiveVideoStreetScan(params: {
   businessType: string;
   baselinePlaces300m: NormalizedBaselinePlace[];
   baselinePlacesLocal: NormalizedBaselinePlace[];
+  selectedLangCode?: string;
   onProgress: (update: StreetScanProgressUpdate) => void;
 }): Promise<{
   fusionResponse: StreetScanFusionResponse;
@@ -294,6 +578,7 @@ export async function runLiveVideoStreetScan(params: {
     businessType,
     baselinePlaces300m,
     baselinePlacesLocal,
+    selectedLangCode = 'eng+tel',
     onProgress,
   } = params;
 
@@ -315,19 +600,65 @@ export async function runLiveVideoStreetScan(params: {
   video.crossOrigin = 'anonymous';
 
   try {
+    console.log(`[StreetScan] Starting video validation for ${file.name} (${file.size} bytes)...`);
     await new Promise<void>((resolve, reject) => {
-      const timeout = window.setTimeout(
-        () => reject(new Error('Timed out reading video metadata')),
-        8000
-      );
-      video.onloadedmetadata = () => {
-        window.clearTimeout(timeout);
+      // If metadata is already available synchronously
+      if (video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0) {
+        console.log(`[StreetScan] Video metadata already available (readyState=${video.readyState}, duration=${video.duration}s).`);
         resolve();
+        return;
+      }
+
+      let done = false;
+      const timeout = window.setTimeout(() => {
+        if (!done) {
+          done = true;
+          cleanup();
+          console.warn(`[StreetScan] Timed out reading metadata for ${file.name}; duration=${video.duration}, readyState=${video.readyState}`);
+          // If the browser parsed dimensions or duration despite missing loadedmetadata event
+          if (video.videoWidth > 0 || (Number.isFinite(video.duration) && video.duration > 0)) {
+            console.log(`[StreetScan] Fallback: video dimensions/duration present (${video.videoWidth}x${video.videoHeight}, ${video.duration}s), proceeding.`);
+            resolve();
+          } else {
+            reject(new Error('Timed out reading video stream metadata. Ensure video is a standard MP4 or MOV recording.'));
+          }
+        }
+      }, 10000);
+
+      const onMetadata = () => {
+        if (!done) {
+          done = true;
+          cleanup();
+          console.log(`[StreetScan] Metadata loaded successfully: ${video.videoWidth}x${video.videoHeight}, ${video.duration}s.`);
+          resolve();
+        }
       };
-      video.onerror = () => {
+
+      const onError = () => {
+        if (!done) {
+          done = true;
+          cleanup();
+          const errCode = video.error ? video.error.code : 'unknown';
+          const errMsg = video.error ? video.error.message : 'Media decode error';
+          console.error(`[StreetScan] Video error event: code=${errCode}, message=${errMsg}`);
+          reject(new Error(`Unsupported or corrupted video file (${errMsg || 'error code ' + errCode})`));
+        }
+      };
+
+      const cleanup = () => {
         window.clearTimeout(timeout);
-        reject(new Error('Unsupported or corrupted video file'));
+        video.removeEventListener('loadedmetadata', onMetadata);
+        video.removeEventListener('loadeddata', onMetadata);
+        video.removeEventListener('canplay', onMetadata);
+        video.removeEventListener('error', onError);
       };
+
+      video.addEventListener('loadedmetadata', onMetadata, { once: true });
+      video.addEventListener('loadeddata', onMetadata, { once: true });
+      video.addEventListener('canplay', onMetadata, { once: true });
+      video.addEventListener('error', onError, { once: true });
+      // Explicitly trigger loading in all browser engines
+      video.load();
     });
 
     const rawDuration =
@@ -516,162 +847,29 @@ export async function runLiveVideoStreetScan(params: {
     });
 
     try {
-      const Tesseract = await import('tesseract.js');
-
-      // ---------------------------------------------------------------------------
-      // Language-data strategy for Tesseract.js v7
-      //
-      // Primary:  local /tessdata/ directory served from public/ (offline-safe, no
-      //           CDN dependency).  Files: eng.traineddata.gz, tel.traineddata.gz
-      //           Source: @tesseract.js-data/{eng,tel}@1.0.0 from jsDelivr, pinned.
-      //
-      // Fallback: jsDelivr CDN pinned to @tesseract.js-data/tel@1.0.0 / eng@1.0.0
-      //           (the same source the Tesseract.js v7 worker uses by default).
-      //
-      // The langPath option tells the worker WHERE to fetch *.traineddata.gz from.
-      // Worker URL pattern: {langPath}/{lang}/4.0.0/{lang}.traineddata.gz
-      // Local files live at:  /tessdata/eng.traineddata.gz  (no subdirectory)
-      //
-      // Because the local files are flat (no /4.0.0/ sub-path), we set langPath to
-      // the directory that contains them directly, i.e. the worker will try:
-      //   /tessdata/tel.traineddata.gz   ← local flat path
-      // But the worker appends /{lang}/4.0.0/{lang}.traineddata.gz, so we need a
-      // different approach: pass the traineddata as a Blob/ArrayBuffer using the
-      // Tesseract.js v7 Lang object API: { code: 'tel', data: ArrayBuffer }
-      // This bypasses CDN entirely and is the only reliable way to use local files.
-      // ---------------------------------------------------------------------------
-
-      /**
-       * Fetches a local traineddata.gz and decompresses it via DecompressionStream.
-       * Returns the raw ArrayBuffer that Tesseract.js v7 accepts as `lang.data`.
-       * Returns null if the asset is missing or DecompressionStream is unavailable.
-       */
-      async function fetchLocalTraineddata(lang: string): Promise<ArrayBuffer | null> {
-        const localUrl = `/tessdata/${lang}.traineddata.gz`;
-        try {
-          const resp = await fetch(localUrl);
-          if (!resp.ok) return null;
-
-          // DecompressionStream is available in all modern browsers (Chrome 80+,
-          // Firefox 113+, Safari 16.4+). Fall back to raw gzip if unavailable —
-          // Tesseract.js v7 handles .gz buffers when gzip:true (the default).
-          if (typeof DecompressionStream !== 'undefined') {
-            const ds = new DecompressionStream('gzip');
-            const decompressed = resp.body!.pipeThrough(ds);
-            const reader = decompressed.getReader();
-            const chunks: Uint8Array[] = [];
-            let done = false;
-            while (!done) {
-              const { value, done: d } = await reader.read();
-              if (value) chunks.push(value);
-              done = d;
-            }
-            const total = chunks.reduce((n, c) => n + c.byteLength, 0);
-            const out = new Uint8Array(total);
-            let offset = 0;
-            for (const chunk of chunks) {
-              out.set(chunk, offset);
-              offset += chunk.byteLength;
-            }
-            return out.buffer;
-          }
-
-          // DecompressionStream unavailable — return raw gzip buffer.
-          // Tesseract.js v7 worker decompresses it internally when gzip:true.
-          return await resp.arrayBuffer();
-        } catch {
-          return null;
-        }
-      }
-
-      // --- Build worker with eng+tel, preferring local assets ---
-      let worker: Awaited<ReturnType<typeof Tesseract.createWorker>> | null = null;
-      let activeOcrLangs = 'eng+tel';
-      let teluguLangStatus: 'local' | 'cdn' | 'unavailable' = 'unavailable';
-
       onProgress({
         stage: 'READING_SIGNS',
-        statusText: 'Loading OCR language data (English + Telugu)...',
+        statusText: `Initializing multilingual OCR engine (${selectedLangCode})...`,
         progressPct: 64,
       });
 
-      // Step 1: attempt to load both languages from local /tessdata/ assets.
-      const [engBuf, telBuf] = await Promise.all([
-        fetchLocalTraineddata('eng'),
-        fetchLocalTraineddata('tel'),
-      ]);
+      console.log(`[StreetScan Video] Initializing Tesseract worker for ${selectedLangCode}...`);
 
-      if (engBuf && telBuf) {
-        // Both local assets available — create worker with inline data (no network).
-        try {
-          worker = await Tesseract.createWorker(
-            [
-              { code: 'eng', data: engBuf },
-              { code: 'tel', data: telBuf },
-            ] as any,
-          );
-          teluguLangStatus = 'local';
-        } catch {
-          // Inline data API failed (older Tesseract.js build); fall through to CDN path.
-          engBuf && (teluguLangStatus = 'unavailable');
-          worker = null as any;
-        }
-      }
+      const { worker, activeLangs, sourceMode, langWarning } =
+        await initMultilingualTesseractWorker(selectedLangCode);
+      const activeOcrLangs = activeLangs;
 
-      // Step 2: if local load failed or files are missing, try CDN with explicit pins.
-      if (!worker || teluguLangStatus === 'unavailable') {
-        // langPath is set to the @tesseract.js-data CDN pinned to version 1.0.0.
-        // The worker constructs: {langPath}/{lang}/4.0.0/{lang}.traineddata.gz
-        // For eng+tel that becomes two separate fetches to the CDN.
-        const pinnedLangPath =
-          'https://cdn.jsdelivr.net/npm/@tesseract.js-data';
-        try {
-          worker = await Tesseract.createWorker('eng+tel', undefined, {
-            langPath: pinnedLangPath,
-            gzip: true,
-          } as any);
-          teluguLangStatus = 'cdn';
-        } catch {
-          // Telugu CDN fetch failed — fall back to English-only.
-          activeOcrLangs = 'eng';
-          teluguLangStatus = 'unavailable';
-          try {
-            if (engBuf) {
-              worker = await Tesseract.createWorker(
-                [{ code: 'eng', data: engBuf }] as any
-              );
-            } else {
-              worker = await Tesseract.createWorker('eng', undefined, {
-                langPath: pinnedLangPath,
-                gzip: true,
-              } as any);
-            }
-          } catch {
-            // If even English fails, rethrow — caught by the outer try/catch which
-            // continues the pipeline with COCO data only.
-            throw new Error('OCR engine failed to initialise (both eng+tel and eng fallback failed)');
-          }
-        }
-      }
-
-      // Step 3: emit a structured onProgress status so the UI can display the warning.
-      // We reuse the READING_SIGNS stage; the statusText encodes the lang status
-      // in a way the UI can parse without a schema change.
-      if (teluguLangStatus === 'unavailable') {
+      if (langWarning) {
         onProgress({
           stage: 'READING_SIGNS',
-          statusText:
-            '__OCR_LANG_WARNING__: Telugu (tel) traineddata could not be loaded ' +
-            '(local asset /tessdata/tel.traineddata.gz unreachable and CDN fetch failed). ' +
-            'Only English is active. Telugu signboard text will NOT be recognised. ' +
-            'Ensure the file is deployed under frontend/public/tessdata/ and the dev/prod server serves it.',
+          statusText: `OCR language notice: ${selectedLangCode} unavailable, English mode active.`,
           progressPct: 64,
+          ocrLangWarning: langWarning,
         });
       } else {
         onProgress({
           stage: 'READING_SIGNS',
-          statusText:
-            `OCR language data loaded: English + Telugu (${teluguLangStatus === 'local' ? 'local asset' : 'jsDelivr CDN'}).`,
+          statusText: `OCR engine ready: ${activeOcrLangs} (${sourceMode === 'local' ? 'local neural asset' : 'CDN asset'}).`,
           progressPct: 64,
         });
       }
@@ -729,7 +927,7 @@ export async function runLiveVideoStreetScan(params: {
               // Normalise to 0..1 only when a real value is present.
               const conf: number | null =
                 rawConf !== null
-                  ? Number(Math.min(0.99, rawConf / 100).toFixed(2))
+                  ? Number((rawConf / 100).toFixed(3))
                   : null;
 
               // --- Conservative noise filter (Unicode-safe) ---
@@ -773,7 +971,7 @@ export async function runLiveVideoStreetScan(params: {
             const rawPageConf = pageData?.confidence;
             const baseConf: number | null =
               typeof rawPageConf === 'number' && rawPageConf > 0
-                ? Number(Math.min(0.98, rawPageConf / 100).toFixed(2))
+                ? Number((rawPageConf / 100).toFixed(3))
                 : null;
             for (const lineStr of rawLines) {
               const normText = normalizeOcrLineClient(lineStr);
@@ -789,9 +987,17 @@ export async function runLiveVideoStreetScan(params: {
           }
         }
       } finally {
-        await worker.terminate();
+        if (worker) {
+          try {
+            await worker.terminate();
+            console.log('[StreetScan] Tesseract worker terminated cleanly.');
+          } catch (tErr) {
+            console.warn('[StreetScan] Error terminating Tesseract worker:', tErr);
+          }
+        }
       }
-    } catch {
+    } catch (ocrErr) {
+      console.warn('[StreetScan] OCR step caught error; continuing with detected objects and partial reads:', ocrErr);
       // OCR engine error is caught gracefully; pipeline still fuses COCO + any completed keyframes
     }
 
@@ -875,6 +1081,446 @@ export async function runLiveVideoStreetScan(params: {
   } finally {
     URL.revokeObjectURL(videoUrl);
   }
+}
+
+/**
+ * Validates and processes a batch of 5–15 storefront photographs (JPG, JPEG, PNG, WebP).
+ * Resizes each image safely to 640px max width for memory-friendly execution,
+ * runs COCO-SSD object detection, multilingual Tesseract OCR, and fuses with 0–300m baseline.
+ */
+export async function runPhotoBatchStreetScan(params: {
+  files: File[];
+  candidate: {
+    latitude: number;
+    longitude: number;
+    state: string;
+    city: string;
+    local_area: string;
+    label: string;
+  };
+  businessType: string;
+  baselinePlaces300m: NormalizedBaselinePlace[];
+  baselinePlacesLocal: NormalizedBaselinePlace[];
+  selectedLangCode?: string;
+  onProgress: (update: StreetScanProgressUpdate) => void;
+  onPhotoProcessed?: (photoIndex: number, total: number, stats: { objects: number; reads: number }) => void;
+}): Promise<{
+  fusionResponse: StreetScanFusionResponse;
+  framePreviews: SampledFramePreview[];
+}> {
+  const {
+    files,
+    candidate,
+    businessType,
+    baselinePlaces300m,
+    baselinePlacesLocal,
+    selectedLangCode = 'eng+tel',
+    onProgress,
+    onPhotoProcessed,
+  } = params;
+
+  if (!files || files.length < 5 || files.length > 15) {
+    throw new Error(`Please select between 5 and 15 photos (received ${files?.length || 0}).`);
+  }
+
+  const validTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  for (const f of files) {
+    const ext = f.name.toLowerCase().split('.').pop() || '';
+    const isValidExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+    if (!validTypes.has(f.type) && !isValidExt) {
+      throw new Error(`File "${f.name}" is not a supported image format. Supported: JPG, JPEG, PNG, WebP.`);
+    }
+    if (f.size > 25 * 1024 * 1024) {
+      throw new Error(`Photo "${f.name}" exceeds the 25MB size limit.`);
+    }
+  }
+
+  onProgress({
+    stage: 'UPLOADING',
+    statusText: `Preparing ${files.length} storefront photographs for scanning...`,
+    progressPct: 10,
+  });
+
+  interface ProcessedCandidateCrop {
+    label: string;
+    box: { x: number; y: number; width: number; height: number };
+    variants: Record<string, PreprocessedCropResult>;
+  }
+
+  interface ProcessedPhotoFrame {
+    frame_index: number;
+    timestamp_sec: number;
+    filename: string;
+    sharpness_score: number;
+    upper_contrast: number;
+    preview_data_url: string;
+    original_data_url: string;
+    ocr_canvas_data_url: string;
+    winning_variant?: string;
+    candidate_crops: ProcessedCandidateCrop[];
+    objects: RawCocoObjectDetection[];
+    ocr_reads: RawFrameOcrRead[];
+    ocr_sampled: boolean;
+  }
+
+  const processedFrames: ProcessedPhotoFrame[] = [];
+  const maxW = 640;
+
+  for (let idx = 0; idx < files.length; idx++) {
+    const file = files[idx];
+    onProgress({
+      stage: 'EXTRACTING_FRAMES',
+      statusText: `Preprocessing high-res photo ${idx + 1}/${files.length}: ${file.name}...`,
+      progressPct: 10 + Math.round(((idx + 1) / files.length) * 25),
+    });
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error(`Failed to load image "${file.name}".`));
+        image.src = objectUrl;
+      });
+
+      const nativeW = img.naturalWidth || img.width || 800;
+      const nativeH = img.naturalHeight || img.height || 600;
+
+      // 1. Dedicated downscaled canvas for COCO-SSD object detection (memory safe & fast)
+      const scale = Math.min(1, maxW / nativeW);
+      const targetW = Math.max(320, Math.round(nativeW * scale));
+      const targetH = Math.max(200, Math.round(nativeH * scale));
+
+      const cocoCanvas = document.createElement('canvas');
+      cocoCanvas.width = targetW;
+      cocoCanvas.height = targetH;
+      const cocoCtx = cocoCanvas.getContext('2d', { willReadFrequently: true });
+      if (!cocoCtx) throw new Error('Canvas 2D context unavailable.');
+      cocoCtx.drawImage(img, 0, 0, targetW, targetH);
+
+      const { sharpness, upperContrast } =
+        computeFrameSharpnessAndTextLikelihood(cocoCtx, targetW, targetH);
+
+      // 2. High-resolution crop generation from the UNMODIFIED source image
+      // Generate multiple candidate signboard regions (Fascia, Kiosk Counter, Commercial Mid)
+      const candidateBoxes = generateDefaultSignboardCrops(nativeW, nativeH);
+      const processedCrops: ProcessedCandidateCrop[] = [];
+
+      for (const cBox of candidateBoxes) {
+        try {
+          const { cropCanvas, scaleFactor } = extractHighResCrop(img, cBox.box, 600);
+          const variants = generatePreprocessingVariants(cropCanvas, scaleFactor);
+          processedCrops.push({
+            label: cBox.label,
+            box: cBox.box,
+            variants,
+          });
+        } catch {
+          // Skip individual crop on failure
+        }
+      }
+
+      // Default crop data URL to the first candidate's enhanced variant (or downscaled fallback)
+      const defaultCropDataUrl =
+        processedCrops[0]?.variants.standard_contrast.dataUrl ||
+        cocoCanvas.toDataURL('image/jpeg', 0.88);
+
+      processedFrames.push({
+        frame_index: idx + 1,
+        timestamp_sec: Number(((idx + 1) * 3.5).toFixed(1)),
+        filename: file.name,
+        sharpness_score: sharpness,
+        upper_contrast: upperContrast,
+        preview_data_url: cocoCanvas.toDataURL('image/jpeg', 0.82),
+        original_data_url: objectUrl,
+        ocr_canvas_data_url: defaultCropDataUrl,
+        candidate_crops: processedCrops,
+        objects: [],
+        ocr_reads: [],
+        ocr_sampled: true,
+      });
+    } finally {
+      // Keep object URL active for previews
+    }
+  }
+
+  // Step 2: COCO Object Detection across photos
+  onProgress({
+    stage: 'DETECTING_OBJECTS',
+    statusText: 'Detecting street activity & vehicles across photo batch...',
+    progressPct: 40,
+  });
+
+  let cocoModel: any = null;
+  try {
+    cocoModel = await getCocoDetectorModel();
+  } catch {
+    cocoModel = null;
+  }
+
+  if (cocoModel) {
+    const probeImg = new Image();
+    for (let i = 0; i < processedFrames.length; i += 1) {
+      const frame = processedFrames[i];
+      onProgress({
+        stage: 'DETECTING_OBJECTS',
+        statusText: `Detecting context in photo ${i + 1}/${processedFrames.length}...`,
+        progressPct: 40 + Math.round(((i + 1) / processedFrames.length) * 20),
+      });
+
+      await new Promise<void>((resolve) => {
+        probeImg.onload = () => resolve();
+        probeImg.onerror = () => resolve();
+        probeImg.src = frame.preview_data_url;
+      });
+
+      try {
+        const predictions: any[] = await cocoModel.detect(probeImg, 18, 0.35);
+        frame.objects = predictions
+          .filter(
+            (p) =>
+              p &&
+              typeof p.class === 'string' &&
+              RELEVANT_COCO_CLASSES.has(p.class.toLowerCase())
+          )
+          .map((p) => {
+            const [bx, by, bw, bh] = Array.isArray(p.bbox) ? p.bbox : [0, 0, 0, 0];
+            return {
+              class_name: p.class.toLowerCase(),
+              confidence: Number((p.score || 0.5).toFixed(2)),
+              bbox: [
+                Number((bx / probeImg.width).toFixed(3)),
+                Number((by / probeImg.height).toFixed(3)),
+                Number((bw / probeImg.width).toFixed(3)),
+                Number((bh / probeImg.height).toFixed(3)),
+              ],
+            };
+          });
+      } catch {
+        // Proceed safely
+      }
+    }
+  }
+
+  // Step 3: Multilingual Tesseract OCR on all photos
+  onProgress({
+    stage: 'READING_SIGNS',
+    statusText: `Initializing multilingual OCR engine (${selectedLangCode})...`,
+    progressPct: 62,
+  });
+
+  try {
+    const { worker, activeLangs, sourceMode, langWarning } =
+      await initMultilingualTesseractWorker(selectedLangCode);
+    const activeOcrLangs = activeLangs;
+
+    if (langWarning) {
+      onProgress({
+        stage: 'READING_SIGNS',
+        statusText: `Language notice: ${selectedLangCode} fell back to English.`,
+        progressPct: 65,
+        ocrLangWarning: langWarning,
+      });
+    } else {
+      onProgress({
+        stage: 'READING_SIGNS',
+        statusText: `OCR engine ready: ${activeOcrLangs} (${sourceMode === 'local' ? 'local neural asset' : 'CDN asset'}).`,
+        progressPct: 64,
+      });
+    }
+
+    try {
+
+      for (let k = 0; k < processedFrames.length; k += 1) {
+        const frame = processedFrames[k];
+        onProgress({
+          stage: 'READING_SIGNS',
+          statusText: `Transcribing signboard text in photo ${k + 1}/${processedFrames.length} (${frame.filename}) [${activeOcrLangs}]...`,
+          progressPct: 65 + Math.round(((k + 1) / processedFrames.length) * 20),
+        });
+
+        let bestCandidateScore = -1;
+        let bestCandidateLines: { raw: string; norm: string; conf: number }[] = [];
+        let winningCropUrl = frame.ocr_canvas_data_url;
+        let winningVariantName = 'standard_contrast';
+
+        // Iterate through high-resolution candidate crops
+        for (const crop of frame.candidate_crops) {
+          const variantsToTry = [
+            crop.variants.standard_contrast,
+            crop.variants.inverted_dark_board,
+            crop.variants.grayscale_sharpened,
+          ].filter(Boolean);
+
+          for (const variant of variantsToTry) {
+            try {
+              const result = await worker.recognize(variant.dataUrl, {}, { blocks: true });
+              const pageData: any = result?.data;
+              const text = String(pageData?.text || '').trim();
+              const rawPageConf = pageData?.confidence;
+              const conf =
+                typeof rawPageConf === 'number' && rawPageConf > 0
+                  ? Number((rawPageConf / 100).toFixed(3))
+                  : 0;
+
+              const { score, isLikelyText } = scoreOcrRead(text, conf);
+              if (score > bestCandidateScore && isLikelyText) {
+                bestCandidateScore = score;
+                winningCropUrl = variant.dataUrl;
+                winningVariantName = variant.variantType;
+
+                const lines: { raw: string; norm: string; conf: number }[] = [];
+                const rawLines = text.split(/\r?\n/).map((s: string) => s.trim()).filter(Boolean);
+                for (const l of rawLines) {
+                  const cleaned = cleanOcrText(l);
+                  const norm = normalizeOcrLineClient(cleaned);
+                  if (isOcrLineUsable(cleaned, norm)) {
+                    lines.push({ raw: cleaned, norm, conf });
+                  }
+                }
+                bestCandidateLines = lines;
+              }
+            } catch {
+              // Continue to next variant
+            }
+          }
+        }
+
+        // If candidates found text, populate ocr_reads and set winning crop
+        if (bestCandidateLines.length > 0) {
+          frame.ocr_canvas_data_url = winningCropUrl;
+          frame.winning_variant = winningVariantName;
+          for (const item of bestCandidateLines) {
+            frame.ocr_reads.push({
+              raw_text: item.raw,
+              normalized_text: item.norm,
+              confidence: item.conf,
+            });
+          }
+        } else {
+          // Fallback: run on full frame preview
+          try {
+            const fallbackResult = await worker.recognize(frame.preview_data_url, {}, { blocks: true });
+            const pageData: any = fallbackResult?.data;
+            const text = String(pageData?.text || '').trim();
+            const rawPageConf = pageData?.confidence;
+            const conf =
+              typeof rawPageConf === 'number' && rawPageConf > 0
+                ? Number((rawPageConf / 100).toFixed(3))
+                : 0;
+            const rawLines = text.split(/\r?\n/).map((s: string) => s.trim()).filter(Boolean);
+            for (const lineStr of rawLines) {
+              const cleaned = cleanOcrText(lineStr);
+              const normText = normalizeOcrLineClient(cleaned);
+              if (!isOcrLineUsable(cleaned, normText)) continue;
+              frame.ocr_reads.push({
+                raw_text: cleaned,
+                normalized_text: normText,
+                confidence: conf,
+              });
+            }
+          } catch {
+            // Ignore fallback error
+          }
+        }
+
+        onPhotoProcessed?.(k + 1, processedFrames.length, {
+          objects: frame.objects.length,
+          reads: frame.ocr_reads.length,
+        });
+      }
+    } finally {
+      if (worker) {
+        try {
+          await worker.terminate();
+        } catch {
+          // ignore
+        }
+      }
+    }
+  } catch (ocrErr) {
+    console.warn('[StreetScan Photo] OCR error:', ocrErr);
+  }
+
+  // Step 4: Temporal/spatial deduplication & fusion via backend
+  onProgress({
+    stage: 'DEDUPLICATING',
+    statusText: 'Consolidating repeated storefront observations across photos...',
+    progressPct: 88,
+  });
+
+  const normalizedFramesPayload: NormalizedFrameObservation[] = processedFrames.map((f) => ({
+    frame_index: f.frame_index,
+    timestamp_sec: f.timestamp_sec,
+    sharpness_score: f.sharpness_score,
+    ocr_sampled: f.ocr_sampled,
+    objects: f.objects,
+    ocr_reads: f.ocr_reads,
+  }));
+
+  onProgress({
+    stage: 'FUSING_EVIDENCE',
+    statusText: 'Fusing 0–300m baseline against photo observations...',
+    progressPct: 94,
+  });
+
+  const fusePayload: StreetScanFuseRequest = {
+    candidate,
+    business_type: businessType,
+    scan_mode: 'PHOTO_BATCH',
+    input_mode: 'PHOTOS',
+    detector_engine: cocoModel
+      ? 'COCO-SSD Object Detection (TensorFlow.js)'
+      : 'Browser Image Analyzer (COCO unavailable)',
+    ocr_engine: `Tesseract.js Storefront OCR [${selectedLangCode}]`,
+    video_metadata: {
+      filename: `${files.length} Storefront Photos Batch`,
+      duration_sec: Number((files.length * 3.5).toFixed(1)),
+      width: maxW,
+      height: 480,
+      sampled_fps: 1,
+      frames_extracted: processedFrames.length,
+      ocr_keyframes_count: processedFrames.length,
+    },
+    frames: normalizedFramesPayload,
+    baseline_places_300m: baselinePlaces300m,
+    baseline_places_local: baselinePlacesLocal,
+  };
+
+  const res = await fetch('/api/street-scan/fuse', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(fusePayload),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Fusion API returned ${res.status}`);
+  }
+
+  const fusionResponse = (await res.json()) as StreetScanFusionResponse;
+
+  const framePreviews: SampledFramePreview[] = processedFrames.map((f) => ({
+    frame_index: f.frame_index,
+    timestamp_sec: f.timestamp_sec,
+    sharpness_score: f.sharpness_score,
+    ocr_sampled: f.ocr_sampled,
+    preview_data_url: f.ocr_canvas_data_url || f.preview_data_url,
+    original_data_url: f.original_data_url,
+    winning_variant: f.winning_variant,
+    objects: f.objects,
+    ocr_reads: f.ocr_reads,
+  }));
+
+  onProgress({
+    stage: 'COMPLETE',
+    statusText: 'Street Scan Photo Batch Fusion complete',
+    progressPct: 100,
+  });
+
+  return { fusionResponse, framePreviews };
 }
 
 const DEMO_ADDITIONAL_SIGNALS_BY_CATEGORY: Record<string, string[]> = {

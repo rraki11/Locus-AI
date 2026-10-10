@@ -11,7 +11,30 @@ export type EvidenceType =
   | 'INFERRED'
   | 'PREDICTED_ANALYTICAL';
 
-export type StreetScanMode = 'LIVE_UPLOAD' | 'CALIBRATED_DEMO';
+export type StreetScanMode = 'LIVE_UPLOAD' | 'CALIBRATED_DEMO' | 'PHOTO_BATCH';
+
+export type StreetScanInputMode = 'VIDEO' | 'PHOTOS';
+
+export interface StreetScanPhotoItem {
+  id: string;
+  file: File;
+  previewUrl: string;
+  name: string;
+  sizeBytes: number;
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'ERROR';
+  error?: string;
+  width?: number;
+  height?: number;
+  ocrReadsCount?: number;
+  cocoObjectsCount?: number;
+  cropPreviewUrl?: string;
+  rawOcrText?: string;
+  normalizedOcrText?: string;
+  ocrConfidence?: number;
+  preprocessingVariant?: string;
+  detectedLanguage?: string;
+  isUserConfirmed?: boolean;
+}
 
 export type StreetScanPipelineStage =
   | 'IDLE'
@@ -86,6 +109,10 @@ export interface DeduplicatedObservedEntity {
   last_seen_sec: number;
   raw_ocr_variants: string[];
   nearby_activity_context: string;
+  user_edited?: boolean;
+  raw_text?: string;
+  script_detected?: string;
+  preprocessing_note?: string;
 }
 
 export type ReconciliationStatus =
@@ -127,6 +154,7 @@ export interface StreetScanFuseRequest {
   };
   business_type: string;
   scan_mode: StreetScanMode;
+  input_mode?: StreetScanInputMode;
   detector_engine: string;
   ocr_engine: string;
   video_metadata: {
@@ -145,6 +173,7 @@ export interface StreetScanFuseRequest {
 
 export interface StreetScanFusionResponse {
   scan_mode: StreetScanMode;
+  input_mode?: StreetScanInputMode;
   detector_engine: string;
   ocr_engine: string;
   spatial_scope: '0-300m';

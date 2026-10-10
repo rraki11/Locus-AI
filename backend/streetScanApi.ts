@@ -5,7 +5,7 @@ import {
   NormalizedBaselinePlace,
 } from './marketBaselineApi';
 
-export type StreetScanMode = 'LIVE_UPLOAD' | 'CALIBRATED_DEMO';
+export type StreetScanMode = 'LIVE_UPLOAD' | 'CALIBRATED_DEMO' | 'PHOTO_BATCH';
 
 export interface RawCocoObjectDetection {
   class_name: string;
@@ -43,6 +43,10 @@ export interface DeduplicatedObservedEntity {
   last_seen_sec: number;
   raw_ocr_variants: string[];
   nearby_activity_context: string;
+  user_edited?: boolean;
+  raw_text?: string;
+  script_detected?: string;
+  preprocessing_note?: string;
 }
 
 export type ReconciliationStatus =
@@ -84,6 +88,7 @@ export interface StreetScanFuseRequest {
   };
   business_type: string;
   scan_mode: StreetScanMode;
+  input_mode?: 'VIDEO' | 'PHOTOS';
   detector_engine: string;
   ocr_engine: string;
   video_metadata: {
@@ -102,6 +107,7 @@ export interface StreetScanFuseRequest {
 
 export interface StreetScanFusionResponse {
   scan_mode: StreetScanMode;
+  input_mode?: 'VIDEO' | 'PHOTOS';
   detector_engine: string;
   ocr_engine: string;
   spatial_scope: '0-300m';
@@ -819,7 +825,12 @@ export function createStreetScanMiddleware() {
       )) as unknown as Partial<StreetScanFuseRequest>;
 
       const scanMode: StreetScanMode =
-        body.scan_mode === 'CALIBRATED_DEMO' ? 'CALIBRATED_DEMO' : 'LIVE_UPLOAD';
+        body.scan_mode === 'CALIBRATED_DEMO'
+          ? 'CALIBRATED_DEMO'
+          : body.scan_mode === 'PHOTO_BATCH'
+          ? 'PHOTO_BATCH'
+          : 'LIVE_UPLOAD';
+      const inputMode = body.input_mode || (scanMode === 'PHOTO_BATCH' ? 'PHOTOS' : 'VIDEO');
       const frames: NormalizedFrameObservation[] = Array.isArray(body.frames)
         ? body.frames
         : [];
@@ -854,8 +865,16 @@ export function createStreetScanMiddleware() {
       const observedCommercialSignals =
         deduplicatedEntities.length + distinctContextClasses;
 
+      const honestyNotice =
+        scanMode === 'CALIBRATED_DEMO'
+          ? 'CALIBRATED DEMO MODE: Using deterministic sample street-scan telemetry anchored to your 0–300m baseline. Upload storefront photos or an MP4/MOV street clip to run live browser COCO object detection and keyframe OCR.'
+          : scanMode === 'PHOTO_BATCH'
+          ? `GROUND REALITY SCOPE (0–300m): Street Scan reflects only the storefronts and physical storefront perspectives captured across the ${frames.length} uploaded photographs, not the entire 2–5km wider market.`
+          : 'GROUND REALITY SCOPE (0–300m): Street Scan reflects only the physical street segment captured in the uploaded video, not the entire 2–5km wider market.';
+
       const response: StreetScanFusionResponse = {
         scan_mode: scanMode,
+        input_mode: inputMode,
         detector_engine:
           body.detector_engine ||
           (scanMode === 'CALIBRATED_DEMO'
@@ -867,12 +886,9 @@ export function createStreetScanMiddleware() {
             ? 'Calibrated Demo Signboard Transcript'
             : 'Tesseract.js Keyframe OCR'),
         spatial_scope: '0-300m',
-        honesty_notice:
-          scanMode === 'CALIBRATED_DEMO'
-            ? 'CALIBRATED DEMO MODE: Using deterministic sample street-scan telemetry anchored to your 0–300m baseline. Upload an MP4/MOV street clip to run live browser COCO object detection and keyframe OCR.'
-            : 'GROUND REALITY SCOPE (0–300m): Street Scan reflects only the physical street segment captured in the uploaded video, not the entire 2–5km wider market.',
+        honesty_notice: honestyNotice,
         video_summary: {
-          filename: body.video_metadata?.filename || 'street-scan.mp4',
+          filename: body.video_metadata?.filename || (scanMode === 'PHOTO_BATCH' ? `${frames.length} storefront photos` : 'street-scan.mp4'),
           duration_sec: Number(
             (body.video_metadata?.duration_sec || frames.length || 0).toFixed(1)
           ),
