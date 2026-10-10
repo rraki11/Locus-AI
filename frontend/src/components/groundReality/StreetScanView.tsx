@@ -10,6 +10,11 @@ import {
 } from 'lucide-react';
 import { WorkspaceSplineAmbient } from '../discovery/WorkspaceSplineAmbient';
 import {
+  WorkspaceStageHero,
+  WorkspaceStageNav,
+  WorkspaceViewKey,
+} from '../common/WorkspaceStageNav';
+import {
   EvidenceType,
   GroundRealityHandoffPayload,
   ReconciledFusionItem,
@@ -23,6 +28,10 @@ import {
   runLiveVideoStreetScan,
   SampledFramePreview,
 } from '../../utils/streetScanPipeline';
+import {
+  DEMO_LOCATION_PRESETS,
+  parseAndValidateCoordinates,
+} from '../../data/marketDiscoveryData';
 
 export interface StreetScanViewProps {
   handoff: GroundRealityHandoffPayload;
@@ -31,14 +40,9 @@ export interface StreetScanViewProps {
   onContinueToIntelligence?: (
     fusionResult: StreetScanFusionResponse | null
   ) => void;
+  unlockedViews?: Set<WorkspaceViewKey>;
+  onNavigateToView?: (targetView: WorkspaceViewKey) => void;
 }
-
-const PROGRESS_STEPS = [
-  { code: '01', label: 'Market Discovery', active: false },
-  { code: '02', label: 'Ground Reality', active: true },
-  { code: '03', label: 'Intelligence', active: false },
-  { code: '04', label: 'Decision', active: false },
-] as const;
 
 const PIPELINE_STEPS: {
   stage: StreetScanPipelineStage;
@@ -122,6 +126,8 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
   preferFallback = false,
   onBackToMarketDiscovery,
   onContinueToIntelligence,
+  unlockedViews,
+  onNavigateToView,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,6 +144,24 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
 
   const [fusionResult, setFusionResult] =
     useState<StreetScanFusionResponse | null>(null);
+
+  const handleStageNav = useCallback(
+    (target: WorkspaceViewKey) => {
+      if (target === 'view1') {
+        onBackToMarketDiscovery();
+      } else if (target === 'view3') {
+        onContinueToIntelligence?.(fusionResult);
+      } else if (onNavigateToView) {
+        onNavigateToView(target);
+      }
+    },
+    [
+      onBackToMarketDiscovery,
+      onContinueToIntelligence,
+      fusionResult,
+      onNavigateToView,
+    ]
+  );
   const [framePreviews, setFramePreviews] = useState<SampledFramePreview[]>([]);
   const [selectedFrameIndex, setSelectedFrameIndex] = useState<number>(1);
   const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('ALL');
@@ -191,17 +215,24 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
     [handoff?.marketBaseline]
   );
 
-  const candidateMeta = useMemo(
-    () => ({
-      latitude: handoff?.coordinates?.lat ?? 12.9352,
-      longitude: handoff?.coordinates?.lng ?? 77.6245,
-      state: handoff?.state ?? '',
-      city: handoff?.city ?? '',
-      local_area: handoff?.localArea ?? '',
-      label: handoff?.candidateName ?? 'Candidate Corridor',
-    }),
-    [handoff]
-  );
+  const safeCoords = useMemo(() => {
+    return parseAndValidateCoordinates(handoff?.coordinates);
+  }, [handoff?.coordinates]);
+
+  const candidateMeta = useMemo(() => {
+    const coords = safeCoords ?? {
+      lat: DEMO_LOCATION_PRESETS[0].lat,
+      lng: DEMO_LOCATION_PRESETS[0].lng,
+    };
+    return {
+      latitude: coords.lat,
+      longitude: coords.lng,
+      state: handoff?.state || DEMO_LOCATION_PRESETS[0].state,
+      city: handoff?.city || DEMO_LOCATION_PRESETS[0].city,
+      local_area: handoff?.localArea || DEMO_LOCATION_PRESETS[0].localArea,
+      label: handoff?.candidateName || DEMO_LOCATION_PRESETS[0].candidateName,
+    };
+  }, [handoff, safeCoords]);
 
   const handleVideoFileSelected = useCallback(
     async (file: File) => {
@@ -330,23 +361,33 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
     pipelineStage !== 'COMPLETE' &&
     pipelineStage !== 'ERROR';
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      const raf = requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, []);
+
   const currentStageRank = STAGE_ORDER[pipelineStage] ?? 0;
 
   return (
     <section
       aria-label="Page 3 — View 2: Street Scan and Ground Truth Fusion"
-      className="relative min-h-screen w-full overflow-hidden bg-[#03020A] text-[#F8FAFC]"
+      className="relative min-h-screen w-full overflow-x-clip bg-[var(--stage-bg-base,#041312)] text-[#F8FAFC] transition-colors duration-[850ms] ease-in-out"
     >
       {/* Shared Ambient Looping Intelligence Field */}
-      <WorkspaceSplineAmbient entryProgress={1} preferFallback={preferFallback} />
+      <WorkspaceSplineAmbient entryProgress={1} preferFallback={preferFallback} themeKey="teal" />
 
       {/* TOP BAR */}
-      <header className="relative z-30 border-b border-white/[0.10] bg-[#050312]/70 backdrop-blur-xl">
+      <header className="relative z-30 border-b border-white/[0.10] bg-[var(--stage-header-bg,rgba(7,29,27,0.80))] backdrop-blur-xl transition-colors duration-[850ms]">
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-6 py-2.5 sm:px-10">
           <div className="flex items-center gap-3.5">
             <div className="flex items-center gap-2">
               <span
-                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#4F46E5] via-[#E879F9] to-[#F97316] shadow-[0_0_10px_rgba(249,115,22,0.85)]"
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#0A3935] via-[#16A085] to-[#78E6C0] shadow-[0_0_10px_rgba(22,160,133,0.85)]"
                 aria-hidden="true"
               />
               <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
@@ -354,54 +395,17 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
               </span>
             </div>
             <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
-            <span className="bg-gradient-to-r from-[#A5B4FC] via-[#E879F9] to-[#FB923C] bg-clip-text text-xs font-semibold text-transparent">
+            <span className="bg-gradient-to-r from-[#78E6C0] via-[#16A085] to-[#A7F3D0] bg-clip-text text-xs font-semibold text-transparent">
               02 / Ground Reality — Street Scan &amp; Ground Truth Fusion
             </span>
           </div>
 
-          {/* 4-View Workspace Sequence */}
-          <nav
-            aria-label="LOCUS Workspace Views"
-            className="flex flex-wrap items-center gap-3"
-          >
-            {PROGRESS_STEPS.map((step, index) => (
-              <React.Fragment key={step.code}>
-                <button
-                  type="button"
-                  disabled={step.code === '04'}
-                  onClick={() => {
-                    if (step.code === '01') {
-                      onBackToMarketDiscovery();
-                    }
-                    if (step.code === '03') {
-                      onContinueToIntelligence?.(fusionResult);
-                    }
-                  }}
-                  className={`inline-flex items-center gap-1.5 text-xs transition-colors ${
-                    step.active
-                      ? 'font-semibold text-white'
-                      : step.code === '01' || step.code === '03'
-                      ? 'cursor-pointer text-slate-300 hover:text-white'
-                      : 'cursor-default text-slate-500'
-                  }`}
-                >
-                  <span
-                    className={`font-mono text-[11px] ${
-                      step.active ? 'text-[#FB923C]' : 'text-slate-500'
-                    }`}
-                  >
-                    {step.code}
-                  </span>
-                  <span>{step.label}</span>
-                </button>
-                {index < PROGRESS_STEPS.length - 1 && (
-                  <span className="text-xs text-slate-600" aria-hidden="true">
-                    →
-                  </span>
-                )}
-              </React.Fragment>
-            ))}
-          </nav>
+          {/* 4-View Workspace Sequence Stepper */}
+          <WorkspaceStageNav
+            currentStage="02"
+            onNavigate={handleStageNav}
+            unlockedViews={unlockedViews}
+          />
 
           <div className="flex items-center gap-2.5">
             {fusionResult && (
@@ -435,14 +439,25 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
               className="liquid-glass-control inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-medium text-slate-200 transition-colors hover:border-[#C084FC]/50 hover:text-white"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-[#E879F9]" />
-              <span>01 / Market Discovery</span>
+              <span>01 / Discovery</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* MAIN 3-COLUMN WORKSPACE */}
-      <div className="relative z-10 mx-auto max-w-[1680px] px-6 py-4 sm:px-10 xl:py-6">
+      <div className="relative z-10 mx-auto max-w-[1680px] px-6 py-4 sm:px-10 xl:py-5">
+        {/* Prominent Stage Identity Strip */}
+        <WorkspaceStageHero
+          currentStage="02"
+          candidateName={candidateMeta.label}
+          city={candidateMeta.city}
+          state={candidateMeta.state}
+          businessType={handoff?.profile?.businessType}
+          onNavigate={handleStageNav}
+          unlockedViews={unlockedViews}
+        />
+
         <div className="grid grid-cols-1 gap-5 xl:gap-6 lg:grid-cols-[minmax(300px,27%)_minmax(0,38%)_minmax(320px,35%)] lg:items-stretch">
           {/* LEFT PANEL: STREET SCAN UPLOAD + VIDEO PREVIEW + PIPELINE STATUS */}
           <aside
@@ -469,6 +484,35 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                 <span className="rounded-xl border border-[#818CF8]/35 bg-[#4F46E5]/15 px-2.5 py-1 font-mono text-[10px] font-semibold text-[#C7D2FE]">
                   {baseline300m.length} in 0–300m DB
                 </span>
+              </div>
+
+              {/* Optional Enhancement Communication & Actions */}
+              <div className="rounded-2xl border border-sky-400/30 bg-sky-500/[0.07] p-3.5 space-y-2.5">
+                <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-sky-300">
+                  <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+                  <span>Optional Ground Enhancement</span>
+                </div>
+                <p className="text-xs leading-relaxed text-slate-200">
+                  Want to add more detail? Upload a short street video to supplement the map-based assessment.
+                </p>
+                <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+                  <button
+                    type="button"
+                    data-testid="skip-to-map-analysis-button"
+                    onClick={() => onContinueToIntelligence?.(fusionResult)}
+                    className="flex-1 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-center text-xs font-semibold text-white transition-colors hover:bg-white/20 hover:border-white/40"
+                  >
+                    Continue with Map-Based Analysis
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isRunning}
+                    onClick={() => !isRunning && fileInputRef.current?.click()}
+                    className="flex-1 rounded-xl border border-[#E879F9]/50 bg-gradient-to-r from-[#7C3AED]/40 to-[#DB2777]/40 px-3 py-2 text-center text-xs font-semibold text-white transition-all hover:brightness-110 disabled:opacity-50"
+                  >
+                    Enhance with Street Scan
+                  </button>
+                </div>
               </div>
 
               {/* Upload Video Control */}
@@ -1168,7 +1212,18 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                   onClick={() => onContinueToIntelligence(fusionResult)}
                   className="flex w-full items-center justify-between rounded-2xl border border-[#E879F9]/55 bg-[linear-gradient(135deg,rgba(79,70,229,0.68)_0%,rgba(168,85,247,0.56)_52%,rgba(249,115,22,0.58)_100%)] px-4 py-2.5 text-xs font-semibold tracking-wide text-white shadow-[0_12px_32px_-8px_rgba(147,51,234,0.55),inset_0_1px_0_rgba(255,255,255,0.28)] transition-all hover:border-[#FB923C] hover:brightness-110 focus:outline-none"
                 >
-                  <span>CONTINUE TO LOCATION INTELLIGENCE</span>
+                  <div className="flex flex-col items-start text-left">
+                    <span>
+                      {fusionResult
+                        ? 'CONTINUE WITH ENHANCED ANALYSIS'
+                        : 'CONTINUE WITH MAP-BASED ANALYSIS'}
+                    </span>
+                    <span className="font-mono text-[10px] text-slate-300 font-normal">
+                      {fusionResult
+                        ? 'Proceed with fused visual and map signals'
+                        : 'Proceed using verified map listings without video'}
+                    </span>
+                  </div>
                   <ArrowRight className="h-4 w-4 text-[#FDBA74]" />
                 </button>
               )}

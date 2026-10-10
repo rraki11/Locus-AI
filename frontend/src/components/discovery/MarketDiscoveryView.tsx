@@ -1,14 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertCircle,
   ArrowRight,
   ArrowUp,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Database,
+  Edit3,
   RefreshCw,
   Search,
+  Sparkles,
 } from 'lucide-react';
+import {
+  AVAILABLE_BUSINESS_FORMATS,
+  AVAILABLE_BUSINESS_PRIORITIES,
+  SAMPLE_BUSINESS_PROFILES,
+  interpretBusinessDescription,
+  parseInrBudget,
+} from '../../utils/businessProfileInterpreter';
 import {
   BUSINESS_PROFILE_OPTIONS,
   BaselineFactorItem,
@@ -31,6 +41,11 @@ import {
 } from '../../data/marketDiscoveryData';
 import { MarketDiscoveryMap } from './MarketDiscoveryMap';
 import { WorkspaceSplineAmbient } from './WorkspaceSplineAmbient';
+import {
+  WorkspaceStageHero,
+  WorkspaceStageNav,
+  WorkspaceViewKey,
+} from '../common/WorkspaceStageNav';
 
 export interface MarketDiscoveryViewProps {
   /** Scroll transition progress from Page 2 into Page 3 (0.0 -> 1.0) */
@@ -47,14 +62,9 @@ export interface MarketDiscoveryViewProps {
     coordinates: { lat: number; lng: number };
     marketBaseline: MarketBaselineResponse | null;
   }) => void;
+  unlockedViews?: Set<WorkspaceViewKey>;
+  onNavigateToView?: (targetView: WorkspaceViewKey) => void;
 }
-
-const PROGRESS_STEPS = [
-  { code: '01', label: 'Market Discovery', active: true },
-  { code: '02', label: 'Ground Reality', active: false },
-  { code: '03', label: 'Intelligence', active: false },
-  { code: '04', label: 'Decision', active: false },
-] as const;
 
 const CATEGORICAL_TEXT_COLOR: Record<CategoricalLevel, string> = {
   HIGH: 'text-[#818CF8]',
@@ -78,9 +88,27 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
   preferFallback = false,
   onBackToPage2,
   onContinueToGroundReality,
+  unlockedViews,
+  onNavigateToView,
 }) => {
   // 1. Business & Hierarchical Location Setup (Preserved across map & geocoding actions)
   const [profile, setProfile] = useState<BusinessProfileConfig>(initialProfile);
+  const [descriptionInput, setDescriptionInput] = useState<string>(
+    initialProfile.businessDescription ?? ''
+  );
+  const [budgetInputStr, setBudgetInputStr] = useState<string>(
+    initialProfile.budget ?? ''
+  );
+  const [budgetValidationError, setBudgetValidationError] = useState<
+    string | null
+  >(null);
+  const [interpretationFeedback, setInterpretationFeedback] = useState<{
+    notes: string[];
+    confidence: 'HIGH' | 'MEDIUM' | 'NEEDS_CLARIFICATION';
+  } | null>(null);
+  const [showAdvancedProfileEdit, setShowAdvancedProfileEdit] =
+    useState<boolean>(false);
+
   const [stateInput, setStateInput] = useState<string>(
     INITIAL_DEMO_PRESET.state
   );
@@ -598,7 +626,69 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
     }
   };
 
-  // Selecting a Business Type (e.g. Café) resolves any pending location edits and computes the baseline
+  // Interpret free-text business description using deterministic rule-based analysis
+  const handleInterpretDescription = (textToInterpret: string) => {
+    if (!textToInterpret.trim()) {
+      setInterpretationFeedback({
+        notes: ['Please enter a business description to interpret.'],
+        confidence: 'NEEDS_CLARIFICATION',
+      });
+      return;
+    }
+
+    const interpreted = interpretBusinessDescription(textToInterpret);
+    setProfile((prev) => ({
+      ...prev,
+      businessDescription: textToInterpret,
+      businessType: interpreted.businessType,
+      categoryKey: interpreted.categoryKey,
+      targetCustomer: interpreted.targetCustomer,
+      preferredFormat: interpreted.preferredFormat ?? prev.preferredFormat,
+      preferredSurroundings: interpreted.preferredSurroundings,
+      priorities: interpreted.priorities,
+      budget: interpreted.budgetValue !== null ? interpreted.budgetFormatted : prev.budget,
+    }));
+
+    if (interpreted.budgetValue !== null) {
+      setBudgetInputStr(interpreted.budgetFormatted);
+      setBudgetValidationError(null);
+    }
+
+    setInterpretationFeedback({
+      notes: interpreted.interpretationNotes,
+      confidence: interpreted.confidence,
+    });
+  };
+
+  // Handle direct budget input updates with strict validation
+  const handleBudgetInputChange = (rawVal: string) => {
+    setBudgetInputStr(rawVal);
+    if (!rawVal.trim()) {
+      setBudgetValidationError('Budget is required');
+      setProfile((prev) => ({ ...prev, budget: '' }));
+      return;
+    }
+
+    const parsed = parseInrBudget(rawVal);
+    if (!parsed.isValid) {
+      setBudgetValidationError(parsed.validationError || 'Invalid budget');
+      setProfile((prev) => ({ ...prev, budget: rawVal }));
+    } else {
+      setBudgetValidationError(parsed.validationError || null);
+      setProfile((prev) => ({
+        ...prev,
+        budget: parsed.formatted,
+      }));
+    }
+  };
+
+  // Load a sample example preset without forcing defaults
+  const handleLoadSampleProfile = (sample: (typeof SAMPLE_BUSINESS_PROFILES)[0]) => {
+    setDescriptionInput(sample.description);
+    handleInterpretDescription(sample.description);
+  };
+
+  // Selecting a Business Type (e.g. Café, Tea Stall) resolves any pending location edits and computes the baseline
   const handleBusinessTypeChange = (nextBusinessType: string) => {
     setProfile((prev) => ({
       ...prev,
@@ -788,6 +878,16 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
   }, []);
 
   const handleProceedToGroundReality = useCallback(() => {
+    if (!profile.budget || !profile.budget.trim()) {
+      setBudgetValidationError('Please enter an available budget in ₹ before proceeding');
+      return;
+    }
+    const parsed = parseInrBudget(profile.budget);
+    if (!parsed.isValid) {
+      setBudgetValidationError(parsed.validationError || 'Please enter a valid numeric budget in ₹');
+      return;
+    }
+
     setGroundRealityHandedOff(true);
     onContinueToGroundReality?.({
       profile,
@@ -799,6 +899,17 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
       marketBaseline: analysis.marketBaseline,
     });
   }, [profile, analysis, onContinueToGroundReality]);
+
+  const handleStageNav = useCallback(
+    (target: WorkspaceViewKey) => {
+      if (target === 'view2') {
+        handleProceedToGroundReality();
+      } else if (onNavigateToView) {
+        onNavigateToView(target);
+      }
+    },
+    [handleProceedToGroundReality, onNavigateToView]
+  );
 
   // Smooth cubic-eased emergence curve as the user transitions from Page 2 into Page 3
   const rawMain = Math.min(1, Math.max(0, (entryProgress - 0.04) / 0.72));
@@ -881,17 +992,18 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
   return (
     <section
       aria-label="Page 3 — View 1: Market Discovery Workspace"
-      className="relative min-h-screen w-full overflow-hidden bg-[#03020A] text-[#F8FAFC]"
+      className="relative min-h-screen w-full overflow-x-clip bg-[var(--stage-bg-base,#051410)] text-[#F8FAFC] transition-colors duration-[850ms] ease-in-out"
     >
       {/* PAGE 3 AMBIENT INTELLIGENCE FIELD (60fps Looping Wave Canvas + Spline + Stippled Grain) */}
       <WorkspaceSplineAmbient
         entryProgress={entryProgress}
         preferFallback={preferFallback}
+        themeKey="emerald"
       />
 
       {/* TOP BAR: Restrained Liquid Glass Workspace Header */}
       <header
-        className="relative z-30 border-b border-white/[0.10] bg-[#050312]/65 backdrop-blur-xl"
+        className="relative z-30 border-b border-white/[0.10] bg-[var(--stage-header-bg,rgba(5,20,16,0.78))] backdrop-blur-xl transition-colors duration-[850ms]"
         style={{
           opacity: headerOpacity,
           transform: `translate3d(0, ${headerTranslateY.toFixed(1)}px, 0)`,
@@ -901,7 +1013,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
           <div className="flex items-center gap-3.5">
             <div className="flex items-center gap-2">
               <span
-                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#4F46E5] via-[#E879F9] to-[#F97316] shadow-[0_0_10px_rgba(249,115,22,0.85)]"
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#0F8B68] via-[#72D9B0] to-[#E9F7F0] shadow-[0_0_10px_rgba(114,217,176,0.85)]"
                 aria-hidden="true"
               />
               <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
@@ -909,51 +1021,17 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
               </span>
             </div>
             <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
-            <span className="bg-gradient-to-r from-[#A5B4FC] via-[#E879F9] to-[#FB923C] bg-clip-text text-xs font-semibold text-transparent">
+            <span className="bg-gradient-to-r from-[#72D9B0] via-[#0F8B68] to-[#E9F7F0] bg-clip-text text-xs font-semibold text-transparent">
               01 / Market Discovery
             </span>
           </div>
 
-          {/* 4-View Workspace Sequence */}
-          <nav
-            aria-label="LOCUS Workspace Views"
-            className="flex flex-wrap items-center gap-3"
-          >
-            {PROGRESS_STEPS.map((step, index) => (
-              <React.Fragment key={step.code}>
-                <button
-                  type="button"
-                  disabled={step.code !== '01' && step.code !== '02'}
-                  onClick={() => {
-                    if (step.code === '02') {
-                      handleProceedToGroundReality();
-                    }
-                  }}
-                  className={`inline-flex items-center gap-1.5 text-xs transition-colors ${
-                    step.active
-                      ? 'font-semibold text-white'
-                      : step.code === '02'
-                      ? 'cursor-pointer text-slate-300 hover:text-white'
-                      : 'cursor-default text-slate-400/80'
-                  }`}
-                >
-                  <span
-                    className={`font-mono text-[11px] ${
-                      step.active ? 'text-[#FB923C]' : 'text-slate-500'
-                    }`}
-                  >
-                    {step.code}
-                  </span>
-                  <span>{step.label}</span>
-                </button>
-                {index < PROGRESS_STEPS.length - 1 && (
-                  <span className="text-xs text-slate-600" aria-hidden="true">
-                    →
-                  </span>
-                )}
-              </React.Fragment>
-            ))}
-          </nav>
+          {/* 4-View Workspace Sequence Stepper */}
+          <WorkspaceStageNav
+            currentStage="01"
+            onNavigate={handleStageNav}
+            unlockedViews={unlockedViews}
+          />
 
           <div className="flex items-center gap-2.5">
             {activeBaseline && (
@@ -996,7 +1074,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
 
       {/* MAIN WORKSPACE */}
       <div
-        className="relative z-10 mx-auto max-w-[1680px] px-6 py-4 transition-transform duration-150 ease-out sm:px-10 xl:py-6"
+        className="relative z-10 mx-auto max-w-[1680px] px-6 py-4 transition-transform duration-150 ease-out sm:px-10 xl:py-5"
         style={{
           opacity: workspaceOpacity,
           transform: `translate3d(0, ${workspaceTranslateY.toFixed(
@@ -1004,6 +1082,17 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
           )}px, 0) scale(${workspaceScale.toFixed(4)})`,
         }}
       >
+        {/* Prominent Stage Identity Strip */}
+        <WorkspaceStageHero
+          currentStage="01"
+          candidateName={analysis.candidateName}
+          city={analysis.city}
+          state={analysis.state}
+          businessType={profile.businessType}
+          onNavigate={handleStageNav}
+          unlockedViews={unlockedViews}
+        />
+
         <div className="grid grid-cols-1 gap-5 xl:gap-6 lg:grid-cols-[minmax(256px,21%)_minmax(0,55%)_minmax(288px,24%)] lg:items-stretch">
           {/* LEFT PANEL: Market Setup + Hierarchical Location Inputs */}
           <aside
@@ -1024,27 +1113,141 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                 </p>
               </div>
 
-              {/* BUSINESS Context */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-slate-300">Business</p>
+              {/* USER-DEFINED BUSINESS PROFILE & INTERPRETATION */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-slate-300">
+                    Business Profile &amp; Budget
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedProfileEdit((prev) => !prev)}
+                    className="inline-flex items-center gap-1 font-mono text-[10px] text-[#C084FC] hover:underline"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    <span>{showAdvancedProfileEdit ? 'Hide Details' : 'Edit All Fields'}</span>
+                  </button>
+                </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-2">
+                {/* 1. Required Multiline Business Description */}
+                <div>
+                  <label
+                    htmlFor="discovery-business-description"
+                    className="block text-[11px] font-medium text-slate-300 mb-1"
+                  >
+                    Describe your business idea <span className="text-[#FB923C]">*</span>
+                  </label>
+                  <textarea
+                    id="discovery-business-description"
+                    data-testid="discovery-business-description"
+                    rows={2}
+                    value={descriptionInput}
+                    onChange={(e) => {
+                      setDescriptionInput(e.target.value);
+                      setProfile((prev) => ({
+                        ...prev,
+                        businessDescription: e.target.value,
+                      }));
+                    }}
+                    placeholder="e.g. Small tea and snacks stall near a college with ₹30,000, mainly serving students."
+                    className="liquid-glass-subtle w-full rounded-xl p-2.5 text-xs text-white placeholder:text-slate-400 focus:border-[#C084FC] focus:outline-none"
+                  />
+                  <div className="mt-1 flex items-center justify-between">
+                    <button
+                      type="button"
+                      data-testid="interpret-description-button"
+                      onClick={() => handleInterpretDescription(descriptionInput)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[#C084FC]/40 bg-[#9333EA]/20 px-2 py-0.5 font-mono text-[10px] font-semibold text-[#E9D5FF] transition-all hover:bg-[#9333EA]/35 hover:text-white"
+                    >
+                      <Sparkles className="h-2.5 w-2.5 text-[#FB923C]" />
+                      <span>Interpret with Rules</span>
+                    </button>
+                    <span className="font-mono text-[9.5px] text-slate-400">
+                      Rule-based analyzer (no LLM)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sample Presets (clearly labeled as examples) */}
+                <div className="space-y-1">
+                  <span className="block font-mono text-[9px] uppercase tracking-wider text-slate-400">
+                    Sample Examples (Optional):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SAMPLE_BUSINESS_PROFILES.map((sample) => (
+                      <button
+                        key={sample.id}
+                        type="button"
+                        onClick={() => handleLoadSampleProfile(sample)}
+                        className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10.5px] text-slate-300 transition-colors hover:border-[#FB923C]/50 hover:bg-[#F97316]/10 hover:text-white"
+                      >
+                        {sample.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Required Editable Numeric Budget in INR */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="discovery-budget-input"
+                      className="block text-[11px] font-medium text-slate-300"
+                    >
+                      Available Budget (INR) <span className="text-[#FB923C]">*</span>
+                    </label>
+                    {profile.budget && !budgetValidationError && (
+                      <span className="font-mono text-[10.5px] font-semibold text-[#FB923C]">
+                        {profile.budget}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative mt-1">
+                    <input
+                      id="discovery-budget-input"
+                      data-testid="discovery-budget-input"
+                      type="text"
+                      value={budgetInputStr}
+                      onChange={(e) => handleBudgetInputChange(e.target.value)}
+                      placeholder="Enter your available budget in ₹ (e.g. 30000, ₹50,000, 15L)"
+                      className={`liquid-glass-subtle w-full rounded-xl py-1.5 pl-3 pr-3 text-xs font-medium text-white transition-colors focus:outline-none ${
+                        budgetValidationError
+                          ? 'border-amber-400/80 focus:border-amber-400'
+                          : 'focus:border-[#C084FC]'
+                      }`}
+                    />
+                  </div>
+                  {budgetValidationError ? (
+                    <p
+                      data-testid="budget-validation-error"
+                      className="mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-300"
+                    >
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{budgetValidationError}</span>
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 text-[10px] text-slate-400">
+                      Total available capital. Distinguishes small setups (e.g. ₹20k–₹50k) from large outlets.
+                    </p>
+                  )}
+                </div>
+
+                {/* 3. Inferred / Confirmed Business Type & Target Customer */}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
                     <label
                       htmlFor="discovery-business-type"
-                      className="sr-only"
+                      className="block text-[10.5px] font-medium text-slate-300 mb-0.5"
                     >
-                      Business category
+                      Business Type / Category
                     </label>
                     <div className="relative">
                       <select
                         id="discovery-business-type"
                         data-testid="discovery-business-type"
                         value={profile.businessType}
-                        onChange={(e) =>
-                          handleBusinessTypeChange(e.target.value)
-                        }
-                        className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-3 pr-7 text-xs font-medium text-white transition-colors focus:border-[#C084FC] focus:outline-none xl:py-2 xl:text-sm"
+                        onChange={(e) => handleBusinessTypeChange(e.target.value)}
+                        className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-2.5 pr-6 text-xs font-medium text-white transition-colors focus:border-[#C084FC] focus:outline-none"
                       >
                         {BUSINESS_PROFILE_OPTIONS.businessTypes.map((type) => (
                           <option
@@ -1056,33 +1259,37 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                           </option>
                         ))}
                       </select>
-                      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     </div>
                   </div>
 
-                  <div className="col-span-1">
-                    <label htmlFor="discovery-budget" className="sr-only">
-                      Budget
+                  <div>
+                    <label
+                      htmlFor="discovery-format"
+                      className="block text-[10.5px] font-medium text-slate-300 mb-0.5"
+                    >
+                      Business Format
                     </label>
                     <div className="relative">
                       <select
-                        id="discovery-budget"
-                        value={profile.budget}
+                        id="discovery-format"
+                        data-testid="discovery-format"
+                        value={profile.preferredFormat || 'stall'}
                         onChange={(e) =>
                           setProfile((prev) => ({
                             ...prev,
-                            budget: e.target.value,
+                            preferredFormat: e.target.value,
                           }))
                         }
-                        className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-2.5 pr-6 text-xs font-medium text-white transition-colors focus:border-[#C084FC] focus:outline-none xl:py-2 xl:text-sm"
+                        className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-2.5 pr-6 text-xs text-white transition-colors focus:border-[#C084FC] focus:outline-none"
                       >
-                        {BUSINESS_PROFILE_OPTIONS.budgets.map((b) => (
+                        {AVAILABLE_BUSINESS_FORMATS.map((fmt) => (
                           <option
-                            key={b}
-                            value={b}
+                            key={fmt.id}
+                            value={fmt.id}
                             className="bg-[#080616] text-white"
                           >
-                            {b}
+                            {fmt.label}
                           </option>
                         ))}
                       </select>
@@ -1091,38 +1298,94 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
                   </div>
                 </div>
 
+                {/* 4. Target Customers (Editable Text Input) */}
                 <div>
                   <label
-                    htmlFor="discovery-target-customer"
-                    className="sr-only"
+                    htmlFor="discovery-target-customer-input"
+                    className="block text-[10.5px] font-medium text-slate-300 mb-0.5"
                   >
-                    Target customer
+                    Target Customers
                   </label>
-                  <div className="relative">
-                    <select
-                      id="discovery-target-customer"
-                      value={profile.targetCustomer}
-                      onChange={(e) =>
-                        setProfile((prev) => ({
-                          ...prev,
-                          targetCustomer: e.target.value,
-                        }))
-                      }
-                      className="liquid-glass-subtle w-full appearance-none rounded-xl py-1.5 pl-3 pr-8 text-xs text-slate-200 transition-colors focus:border-[#C084FC] focus:outline-none xl:py-2 xl:text-sm"
-                    >
-                      {BUSINESS_PROFILE_OPTIONS.targetCustomers.map((cust) => (
-                        <option
-                          key={cust}
-                          value={cust}
-                          className="bg-[#080616] text-white"
+                  <input
+                    id="discovery-target-customer-input"
+                    data-testid="discovery-target-customer-input"
+                    type="text"
+                    value={profile.targetCustomer}
+                    onChange={(e) =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        targetCustomer: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. College students, office workers"
+                    className="liquid-glass-subtle w-full rounded-xl py-1.5 px-3 text-xs text-white transition-colors focus:border-[#C084FC] focus:outline-none"
+                  />
+                </div>
+
+                {/* Optional Strategic Priorities */}
+                <div>
+                  <span className="block text-[10.5px] font-medium text-slate-300 mb-1">
+                    Primary Priorities
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {AVAILABLE_BUSINESS_PRIORITIES.map((pri) => {
+                      const isSelected = profile.priorities?.includes(pri.id) ?? false;
+                      return (
+                        <button
+                          key={pri.id}
+                          type="button"
+                          onClick={() => {
+                            setProfile((prev) => {
+                              const curr = prev.priorities || [];
+                              const next = isSelected
+                                ? curr.filter((p) => p !== pri.id)
+                                : [...curr, pri.id];
+                              return { ...prev, priorities: next };
+                            });
+                          }}
+                          className={`rounded-lg border px-2 py-0.5 font-mono text-[9.5px] font-medium transition-colors ${
+                            isSelected
+                              ? 'border-[#FB923C]/60 bg-[#F97316]/20 text-[#FED7AA]'
+                              : 'border-white/10 bg-white/[0.02] text-slate-400 hover:text-white'
+                          }`}
                         >
-                          {cust}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                          {pri.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
+
+                {/* Rule-Based Interpretation Feedback Box */}
+                {interpretationFeedback && (
+                  <div
+                    data-testid="interpretation-feedback-box"
+                    className="rounded-xl border border-white/10 bg-white/[0.02] p-2.5 space-y-1 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-[#A5B4FC]">
+                        Rule Analysis Provenance:
+                      </span>
+                      <span
+                        className={`rounded px-1.5 py-0.2 font-mono text-[9px] font-bold ${
+                          interpretationFeedback.confidence === 'HIGH'
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : 'bg-amber-500/20 text-amber-300'
+                        }`}
+                      >
+                        {interpretationFeedback.confidence} CONFIDENCE
+                      </span>
+                    </div>
+                    <ul className="space-y-0.5 text-[10.5px] text-slate-300">
+                      {interpretationFeedback.notes.map((note, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5">
+                          <span className="text-[#818CF8]">•</span>
+                          <span>{note}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-white/[0.08]" />

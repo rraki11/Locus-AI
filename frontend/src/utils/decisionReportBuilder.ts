@@ -1,8 +1,12 @@
 import {
+  AnalysisMode,
   DecisionReportHandoffPayload,
+  EvidenceCoverageSummary,
   EvidenceLedgerRow,
   FinalPostureReason,
   MarketEntryReportData,
+  PlainLanguageOutcome,
+  PlainLanguageReasonItem,
   ReportLimitationItem,
   ShortDecisionPosture,
 } from '../types/decisionReport';
@@ -206,11 +210,11 @@ export function buildMarketEntryReport(
         }
       : {
           executed: false,
-          status_badge: 'DATABASE BASELINE ONLY',
+          status_badge: 'MAP-BASED BASELINE',
           corridor_scope_statement:
-            'The Street Scan represents only the physical corridor captured in the uploaded footage.',
+            'Map-Based Assessment incorporates verified commercial places and street networks within 0–300m walking radius.',
           unavailable_explanation:
-            'Ground-level evidence is unavailable for this analysis.',
+            'Operating in Map-Based mode using verified commercial places within the 0–300m walking catchment. Street Scan video is an optional enhancement for visual storefront and activity detection.',
           counts: {
             observed_entities: 0,
             ocr_confirmed_names: 0,
@@ -244,7 +248,7 @@ export function buildMarketEntryReport(
         additional_observed_signals: 0,
         baseline_only: mapped300m,
         reconciliation_note:
-          'Street Scan has not been executed for this location. Reconciliation displays only the 0–300m mapped database baseline with zero observed street-level entities.',
+          'Operating in Map-Based Analysis mode. Displays the 0–300m mapped database baseline. An optional Street Scan can be uploaded in Step 02 to reconcile against on-ground visual signals.',
       };
 
   // 4. Evidence Ledger (DATABASE + OBSERVED + INFERRED + PREDICTED_ANALYTICAL)
@@ -470,11 +474,11 @@ export function buildMarketEntryReport(
     });
   } else {
     reasons.push({
-      id: 'reason-missing-ground',
-      polarity: 'NEGATIVE',
-      headline: 'Limited ground-level coverage (Street Scan not executed)',
+      id: 'reason-map-coverage',
+      polarity: 'POSITIVE',
+      headline: `Structured map coverage (${totalMapped} mapped businesses indexed)`,
       detail:
-        'Evaluation relies solely on structured database baseline; 0–300m physical storefront verification is pending.',
+        `Evaluation built from structured commercial database baseline across ${totalMapped} nearby places. Optional street video can provide additional visual storefront validation.`,
       evidence_type: 'DATABASE',
     });
   }
@@ -538,6 +542,296 @@ export function buildMarketEntryReport(
     ? `Evaluated under active scenario assumptions (Rent ${formatSignedDelta(scenarioAssumptions.rentDeltaPct, '%')}, Activity ${formatSignedDelta(scenarioAssumptions.activityDeltaPct, '%')}, Competition ${formatSignedDelta(scenarioAssumptions.competitionDeltaCount, '')}), shifting ${comparison.shifted_factors.length} intelligence factor(s) from baseline.`
     : 'Evaluated at current baseline assumptions (0% Rent delta, 0% Activity delta, 0 Competition delta). Adjust View 3 Scenario Simulator sliders to test downside or upside sensitivity.';
 
+  // --- PLAIN-LANGUAGE EXECUTIVE OUTCOME & REASONING (FOR ORDINARY USERS) ---
+  const hasBaseline = Boolean(marketBaseline && totalMapped > 0);
+  const rentDelta = scenarioAssumptions.rentDeltaPct;
+  const additionalSignals = streetScanFusion?.counts.additional_signals ?? 0;
+  const observedEntities = streetScanFusion?.counts.observed_entities ?? 0;
+  const budgetText = profile.budget
+    ? (profile.budget.startsWith('₹') ? profile.budget : `₹${profile.budget}`)
+    : '';
+
+  // 1. Plain-Language Outcome: exactly one of 4 defined states
+  let plainOutcome: PlainLanguageOutcome;
+  let plainOutcomeTheme: 'emerald' | 'amber' | 'rose' | 'slate';
+
+  if (!hasBaseline || totalMapped < 2) {
+    plainOutcome = 'NOT ENOUGH INFORMATION YET';
+    plainOutcomeTheme = 'slate';
+  } else if (
+    activeEval.decision_posture.posture === 'HIGH STRUCTURAL PRESSURE' ||
+    (marketOverview.commercial_density.level === 'STRONG' && marketOverview.commercial_activity.level === 'LOW') ||
+    (mapped300m >= 5 && marketOverview.customer_fit.level === 'LOW')
+  ) {
+    plainOutcome = 'CONSIDER ANOTHER LOCATION';
+    plainOutcomeTheme = 'rose';
+  } else if (
+    activeEval.decision_posture.posture === 'ELEVATED SENSITIVITY — PROCEED WITH CAUTION' ||
+    (activeEval.decision_posture.posture === 'VIABLE WITH DIFFERENTIATION' && (mapped300m >= 3 || additionalSignals >= 3 || rentDelta >= 15)) ||
+    mapped300m >= 3 ||
+    rentDelta >= 15 ||
+    activeEval.factors.some((f) => f.key === 'risk' && (f.rating === 'HIGH' || f.rating === 'STRONG'))
+  ) {
+    plainOutcome = 'POSSIBLE, WITH SOME RISKS';
+    plainOutcomeTheme = 'amber';
+  } else {
+    // Supportive baseline/street signals; favorable entry posture
+    plainOutcome = 'LOOKS PROMISING';
+    plainOutcomeTheme = 'emerald';
+  }
+
+  // 2. Plain-Language Explanation: answers what looks good, what could make it difficult, what is unknown, what to check
+  const explanationSentences: string[] = [];
+
+  // What looks good:
+  if (totalMapped >= 4) {
+    explanationSentences.push(
+      `Information from the map shows ${totalMapped} nearby businesses, indicating this area already draws regular customer foot traffic.`
+    );
+  } else if (totalMapped >= 1) {
+    explanationSentences.push(
+      `Information from the map shows commercial activity in this neighborhood with ${totalMapped} active businesses operating nearby.`
+    );
+  } else {
+    explanationSentences.push(
+      `Map data currently shows very few commercial establishments recorded around this specific spot.`
+    );
+  }
+
+  // What could make it difficult:
+  if (mapped300m > 0) {
+    explanationSentences.push(
+      `However, ${mapped300m} similar ${mapped300m === 1 ? 'business is' : 'businesses are'} already operating within 300 metres, so local customers already have close alternatives.`
+    );
+  } else if (streetScanExecuted && additionalSignals > 0) {
+    explanationSentences.push(
+      `However, what the street video detected includes ${additionalSignals} unmapped ${additionalSignals === 1 ? 'stall or competitor' : 'stalls or competitors'} along this road that do not show up on standard maps.`
+    );
+  } else if (rentDelta > 0) {
+    explanationSentences.push(
+      `However, testing a +${rentDelta}% rent increase suggests higher monthly costs would quickly squeeze margins.`
+    );
+  } else if (budgetText) {
+    explanationSentences.push(
+      `Operating under your ${budgetText} budget leaves little financial margin if setup costs or initial customer traction take longer than expected.`
+    );
+  }
+
+  // What is still unknown:
+  if (!streetScanExecuted) {
+    explanationSentences.push(
+      `Exact storefront visibility, informal street vendors, and on-ground pedestrian flow have not been visually checked and are best confirmed during an on-site visit.`
+    );
+  } else {
+    explanationSentences.push(
+      `While the street video confirmed visible storefront frontage, daily customer flow at different times of the week and exact landlord lease terms have not been verified.`
+    );
+  }
+
+  // What should the user check before spending money:
+  explanationSentences.push(
+    `Before paying a deposit or signing a lease, visit this spot during your expected busy hours, verify exact landlord rent and utilities in writing, and confirm local permissions.`
+  );
+
+  const plainExplanation = explanationSentences.join(' ');
+
+  // 3. WHY THIS LOCATION MAY WORK (up to 3 plain-language items)
+  const whyItMayWork: PlainLanguageReasonItem[] = [];
+
+  if (totalMapped >= 4) {
+    whyItMayWork.push({
+      point: `${totalMapped} businesses are found nearby, suggesting this area already attracts everyday commercial visitors.`,
+      source_tag: 'Information from the map',
+    });
+  } else if (totalMapped >= 1) {
+    whyItMayWork.push({
+      point: `Commercial presence exists with ${totalMapped} nearby shops operating in the immediate area.`,
+      source_tag: 'Information from the map',
+    });
+  }
+
+  if (profile.targetCustomer && (marketOverview.customer_fit.level === 'STRONG' || marketOverview.customer_fit.level === 'HIGH')) {
+    whyItMayWork.push({
+      point: `The surrounding neighborhood appears well-matched for your target customers (${profile.targetCustomer}).`,
+      source_tag: 'Our best estimate from the available information',
+    });
+  } else if (marketOverview.accessibility.level === 'STRONG' || marketOverview.accessibility.level === 'HIGH') {
+    whyItMayWork.push({
+      point: `Road connectivity and transit stops make it relatively easy for visitors to reach this spot.`,
+      source_tag: 'Information from the map',
+    });
+  }
+
+  if (streetScanExecuted && observedEntities > 0) {
+    whyItMayWork.push({
+      point: `What the street video detected includes ${observedEntities} active storefronts and pedestrian movement along this road.`,
+      source_tag: 'What the street video detected',
+    });
+  } else if (mapped300m === 0) {
+    whyItMayWork.push({
+      point: `No direct competitors were found within immediate walking distance (0–300m) on standard maps.`,
+      source_tag: 'Information from the map',
+    });
+  } else if (whyItMayWork.length < 3 && marketOverview.commercial_activity.level !== 'LOW') {
+    whyItMayWork.push({
+      point: `The wider area supports active commercial demand across multiple retail and food categories.`,
+      source_tag: 'Information from the map',
+    });
+  }
+
+  // 4. WHAT COULD GO WRONG (up to 2 important risks)
+  const whatCouldGoWrong: PlainLanguageReasonItem[] = [];
+
+  if (mapped300m > 0) {
+    whatCouldGoWrong.push({
+      point: `${mapped300m} similar ${mapped300m === 1 ? 'business is' : 'businesses are'} already operating within 300 metres, competing for the same customers.`,
+      source_tag: 'Information from the map',
+    });
+  } else if (streetScanExecuted && additionalSignals > 0) {
+    whatCouldGoWrong.push({
+      point: `What the street video detected includes ${additionalSignals} unmapped informal ${additionalSignals === 1 ? 'stall' : 'stalls'} not visible on online maps.`,
+      source_tag: 'What the street video detected',
+    });
+  }
+
+  if (rentDelta > 0) {
+    whatCouldGoWrong.push({
+      point: `Under the tested +${rentDelta}% rent scenario, higher monthly overhead could quickly strain your margins.`,
+      source_tag: 'From scenario testing',
+    });
+  } else if (budgetText) {
+    whatCouldGoWrong.push({
+      point: `Actual landlord rent, security deposits, and power/water costs have not been verified against your ${budgetText} budget.`,
+      source_tag: 'What we still need to check',
+    });
+  } else {
+    whatCouldGoWrong.push({
+      point: `Actual shop rent, advance deposits, and setup expenses have not been verified with property owners.`,
+      source_tag: 'What we still need to check',
+    });
+  }
+
+  if (whatCouldGoWrong.length < 2 && !streetScanExecuted) {
+    whatCouldGoWrong.push({
+      point: `Storefront visibility and pavement foot traffic remain to be verified on the ground or with an optional street video.`,
+      source_tag: 'What we still need to check',
+    });
+  }
+
+  // 5. WHAT TO DO BEFORE SPENDING MONEY (1 specific, practical next step based on most important missing evidence)
+  let whatToDoBeforeSpending = '';
+  if (mapped300m >= 3) {
+    whatToDoBeforeSpending = `Visit the ${mapped300m} closest competing shops within 300 metres to compare their exact menu, pricing, and peak customer hours before deciding your offerings.`;
+  } else if (rentDelta > 0 && budgetText) {
+    whatToDoBeforeSpending = `Confirm the landlord's total monthly rent and advance deposit in writing to guarantee setup costs stay safely within your ${budgetText} budget.`;
+  } else {
+    whatToDoBeforeSpending = 'Visit this exact spot during morning and evening peak hours to observe real pedestrian traffic and ask neighboring shopkeepers about lease terms and permissions.';
+  }
+
+  // Analysis Mode & Scope Explanation
+  const analysisMode: AnalysisMode = streetScanExecuted ? 'MAP_AND_STREET' : 'MAP_BASED';
+  const modeLabel: 'MAP-BASED ASSESSMENT' | 'MAP + STREET EVIDENCE' = streetScanExecuted
+    ? 'MAP + STREET EVIDENCE'
+    : 'MAP-BASED ASSESSMENT';
+  const confidenceLabel = modeLabel;
+
+  const scopeExplanation = streetScanExecuted
+    ? 'This assessment combines mapped business data with on-the-ground visual evidence from your street footage. Visual signals provide storefront and activity context along the recorded corridor.'
+    : 'This assessment uses the available map and business information to evaluate the area. A street video can add visual evidence, but it is optional. Some details, such as exact storefront visibility, informal vendors and real pedestrian activity, may require an on-site check.';
+
+  const isProvisional = activeEval.data_mode === 'DEMO';
+  const provisionalReason = activeEval.data_mode === 'DEMO'
+    ? 'Market baseline uses calibrated demo registry data. Connect live Google Places API for real-time provider listings.'
+    : 'Assessment synthesized from live mapped business listings and spatial network data.';
+
+  // Neutral Evidence Coverage Summary
+  const hasLivePlaces = activeEval.data_mode === 'LIVE';
+  const hasDemoPlaces = totalMapped > 0;
+  const businessListingsStatus: EvidenceCoverageSummary['business_listings'] = hasLivePlaces
+    ? 'AVAILABLE'
+    : hasDemoPlaces
+    ? 'DEMO_BASELINE'
+    : 'UNAVAILABLE';
+  const businessListingsLabel = hasLivePlaces
+    ? `Live Google Places (${totalMapped} places)`
+    : hasDemoPlaces
+    ? `Demo baseline registry (${totalMapped} places)`
+    : 'No listings returned';
+
+  const geographicContextStatus: EvidenceCoverageSummary['geographic_context'] =
+    coordinates && coordinates.lat ? 'AVAILABLE' : 'UNAVAILABLE';
+  const geographicContextLabel = coordinates
+    ? `${localArea || city} (${coordinates.lat.toFixed(4)}, ${coordinates.lng.toFixed(4)})`
+    : 'Location not resolved';
+
+  const streetVisualStatus: EvidenceCoverageSummary['street_visual_evidence'] =
+    streetScanExecuted ? 'AVAILABLE' : 'NOT_PROVIDED';
+  const streetVisualLabel = streetScanExecuted
+    ? streetScanFusion?.scan_mode === 'LIVE_UPLOAD'
+      ? 'Live street video analyzed'
+      : 'Calibrated scan telemetry'
+    : 'Not provided (optional enhancement)';
+
+  const rentCostsStatus: EvidenceCoverageSummary['rent_operating_costs'] = budgetText
+    ? 'USER_PROVIDED'
+    : 'UNKNOWN';
+  const rentCostsLabel = budgetText
+    ? `User budget: ${budgetText}`
+    : 'Unknown (unspecified)';
+
+  const evidenceCoverage: EvidenceCoverageSummary = {
+    business_listings: businessListingsStatus,
+    business_listings_label: businessListingsLabel,
+    geographic_context: geographicContextStatus,
+    geographic_context_label: geographicContextLabel,
+    street_visual_evidence: streetVisualStatus,
+    street_visual_evidence_label: streetVisualLabel,
+    rent_operating_costs: rentCostsStatus,
+    rent_operating_costs_label: rentCostsLabel,
+  };
+
+  // Top 3 supporting signals
+  const keySupportingSignals = reasons
+    .filter((r) => r.polarity === 'POSITIVE')
+    .slice(0, 3)
+    .map((r) => ({
+      label: r.headline,
+      detail: r.detail,
+      evidence_type: r.evidence_type,
+    }));
+
+  if (keySupportingSignals.length < 3) {
+    if (baseAccessFactor && !keySupportingSignals.some((s) => s.label.includes('Accessibility'))) {
+      keySupportingSignals.push({
+        label: `Frontage Accessibility (${baseAccessFactor.rating})`,
+        detail: baseAccessFactor.explanation,
+        evidence_type: baseAccessFactor.evidence_type,
+      });
+    }
+  }
+
+  // Top 2 key risks or evidence gaps
+  const keyRisksOrGaps = reasons
+    .filter((r) => r.polarity === 'NEGATIVE')
+    .slice(0, 2)
+    .map((r) => ({
+      label: r.headline,
+      detail: r.detail,
+      evidence_type: r.evidence_type,
+    }));
+
+  if (keyRisksOrGaps.length < 2 && risksAndLimitations.length > 0) {
+    const fallbackLim = risksAndLimitations[0];
+    keyRisksOrGaps.push({
+      label: fallbackLim.scope,
+      detail: fallbackLim.statement,
+      evidence_type: fallbackLim.evidence_type,
+    });
+  }
+
+  // Most useful next validation step
+  let nextValidationStep = whatToDoBeforeSpending;
+
   return {
     generated_at: comparison.evaluated_at,
     data_mode: activeEval.data_mode,
@@ -556,8 +850,27 @@ export function buildMarketEntryReport(
       analysis_timestamp: comparison.evaluated_at,
       short_posture: shortPosture,
       engine_posture_level: activeEval.decision_posture.posture,
-      posture_headline: activeEval.decision_posture.headline,
+      posture_headline: plainOutcome,
       posture_evidence_type: activeEval.decision_posture.evidence_type,
+    },
+
+    executiveSummary: {
+      outcome: plainOutcome,
+      outcome_theme: plainOutcomeTheme,
+      analysis_mode: analysisMode,
+      mode_label: modeLabel,
+      scope_explanation: scopeExplanation,
+      evidence_coverage: evidenceCoverage,
+      plain_explanation: plainExplanation,
+      why_it_may_work: whyItMayWork.slice(0, 3),
+      what_could_go_wrong: whatCouldGoWrong.slice(0, 2),
+      what_to_do_before_spending: whatToDoBeforeSpending,
+      is_provisional: isProvisional,
+      confidence_label: confidenceLabel,
+      provisional_reason: provisionalReason,
+      key_supporting_signals: keySupportingSignals,
+      key_risks_or_gaps: keyRisksOrGaps,
+      next_validation_step: nextValidationStep,
     },
 
     marketOverview,

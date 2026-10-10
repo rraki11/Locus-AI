@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -11,7 +11,14 @@ import {
 import { WorkspaceSplineAmbient } from '../discovery/WorkspaceSplineAmbient';
 import { MarketDiscoveryMap } from '../discovery/MarketDiscoveryMap';
 import {
+  WorkspaceStageHero,
+  WorkspaceStageNav,
+  WorkspaceViewKey,
+} from '../common/WorkspaceStageNav';
+import {
   CategoricalLevel,
+  DEMO_LOCATION_PRESETS,
+  parseAndValidateCoordinates,
   resolveLocationAnalysis,
 } from '../../data/marketDiscoveryData';
 import { EvidenceType } from '../../types/streetScan';
@@ -36,14 +43,9 @@ export interface LocationIntelligenceViewProps {
     scenarioAssumptions: ScenarioAssumptions;
     comparison: LocationIntelligenceComparisonResponse;
   }) => void;
+  unlockedViews?: Set<WorkspaceViewKey>;
+  onNavigateToView?: (targetView: WorkspaceViewKey) => void;
 }
-
-const PROGRESS_STEPS = [
-  { code: '01', label: 'Market Discovery', active: false },
-  { code: '02', label: 'Ground Reality', active: false },
-  { code: '03', label: 'Intelligence', active: true },
-  { code: '04', label: 'Decision', active: false },
-] as const;
 
 const RATING_BADGE_STYLE: Record<CategoricalLevel, string> = {
   STRONG: 'border-[#FB923C]/45 bg-[#F97316]/18 text-[#FDBA74]',
@@ -147,6 +149,8 @@ export const LocationIntelligenceView: React.FC<
   onBackToMarketDiscovery,
   onBackToGroundReality,
   onContinueToDecision,
+  unlockedViews,
+  onNavigateToView,
 }) => {
   const [assumptions, setAssumptions] = useState<ScenarioAssumptions>(
     BASELINE_SCENARIO_ASSUMPTIONS
@@ -154,17 +158,24 @@ export const LocationIntelligenceView: React.FC<
   const [selectedFactorKey, setSelectedFactorKey] =
     useState<IntelligenceFactorKey>('competition');
 
-  const candidateMeta = useMemo(
-    () => ({
-      latitude: handoff?.coordinates?.lat ?? 12.9352,
-      longitude: handoff?.coordinates?.lng ?? 77.6245,
-      state: handoff?.state ?? '',
-      city: handoff?.city ?? '',
-      local_area: handoff?.localArea ?? '',
-      label: handoff?.candidateName ?? 'Candidate Corridor',
-    }),
-    [handoff]
-  );
+  const safeCoords = useMemo(() => {
+    return parseAndValidateCoordinates(handoff?.coordinates) ?? null;
+  }, [handoff?.coordinates]);
+
+  const candidateMeta = useMemo(() => {
+    const coords = safeCoords ?? {
+      lat: DEMO_LOCATION_PRESETS[0].lat,
+      lng: DEMO_LOCATION_PRESETS[0].lng,
+    };
+    return {
+      latitude: coords.lat,
+      longitude: coords.lng,
+      state: handoff?.state || DEMO_LOCATION_PRESETS[0].state,
+      city: handoff?.city || DEMO_LOCATION_PRESETS[0].city,
+      local_area: handoff?.localArea || DEMO_LOCATION_PRESETS[0].localArea,
+      label: handoff?.candidateName || DEMO_LOCATION_PRESETS[0].candidateName,
+    };
+  }, [handoff, safeCoords]);
 
   // Run the unified Location Intelligence Engine for both Baseline (0,0,0) and Scenario assumptions
   const comparison = useMemo(
@@ -183,6 +194,31 @@ export const LocationIntelligenceView: React.FC<
     [handoff?.profile, candidateMeta, handoff?.marketBaseline, handoff?.streetScanFusion, assumptions]
   );
 
+  const handleStageNav = useCallback(
+    (target: WorkspaceViewKey) => {
+      if (target === 'view1') {
+        onBackToMarketDiscovery();
+      } else if (target === 'view2') {
+        onBackToGroundReality();
+      } else if (target === 'view4') {
+        onContinueToDecision?.({
+          scenarioAssumptions: assumptions,
+          comparison,
+        });
+      } else if (onNavigateToView) {
+        onNavigateToView(target);
+      }
+    },
+    [
+      onBackToMarketDiscovery,
+      onBackToGroundReality,
+      onContinueToDecision,
+      assumptions,
+      comparison,
+      onNavigateToView,
+    ]
+  );
+
   const activeEvaluation = comparison.scenario_evaluation;
   const baselineEvaluation = comparison.baseline_evaluation;
 
@@ -195,16 +231,19 @@ export const LocationIntelligenceView: React.FC<
   const mapAnalysis = useMemo(
     () =>
       resolveLocationAnalysis({
-        state: handoff?.state ?? '',
-        city: handoff?.city ?? '',
-        localArea: handoff?.localArea ?? '',
-        coordinates: handoff?.coordinates ?? { lat: 12.9352, lng: 77.6245 },
+        state: candidateMeta.state,
+        city: candidateMeta.city,
+        localArea: candidateMeta.local_area,
+        coordinates: {
+          lat: candidateMeta.latitude,
+          lng: candidateMeta.longitude,
+        },
         hasUserSelectedLocation: true,
         cameraLevel: 'candidate',
-        customCandidateLabel: handoff?.candidateName,
+        customCandidateLabel: candidateMeta.label,
         marketBaseline: handoff?.marketBaseline,
       }),
-    [handoff]
+    [candidateMeta, handoff?.marketBaseline]
   );
 
   const selectedFactor = useMemo(
@@ -217,21 +256,73 @@ export const LocationIntelligenceView: React.FC<
   const postureStyle =
     POSTURE_CARD_STYLE[activeEvaluation.decision_posture.posture];
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      const raf = requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, []);
+
+  // Graceful recoverable screen if coordinates are invalid or missing
+  if (!safeCoords && (!handoff?.coordinates || !parseAndValidateCoordinates(handoff.coordinates))) {
+    return (
+      <section
+        aria-label="Location Intelligence — Missing Candidate"
+        className="relative flex min-h-screen w-full items-center justify-center overflow-x-clip bg-[#03020A] px-6 text-[#F8FAFC]"
+      >
+        <WorkspaceSplineAmbient entryProgress={1} preferFallback={preferFallback} />
+        <div className="relative z-10 max-w-lg rounded-3xl border border-amber-400/40 bg-[#0A071A]/90 p-8 shadow-2xl backdrop-blur-2xl">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-500/20 text-amber-300">
+              <AlertTriangle className="h-5 w-5" />
+            </span>
+            <div>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                03 / Location Intelligence
+              </span>
+              <h2 className="font-display text-lg font-bold text-white">
+                Candidate Coordinates Required
+              </h2>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs leading-relaxed text-slate-300">
+            No valid candidate location coordinates were received. Return to Market Discovery to select a candidate corridor on the map.
+          </p>
+
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onBackToMarketDiscovery}
+              className="inline-flex items-center gap-2 rounded-xl border border-sky-400/50 bg-sky-500/20 px-4 py-2 text-xs font-semibold text-sky-200 transition-all hover:bg-sky-500/30 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to 01 / Market Discovery</span>
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label="Page 3 — View 3: Location Intelligence and Scenario Simulator"
-      className="relative min-h-screen w-full overflow-hidden bg-[#03020A] text-[#F8FAFC]"
+      className="relative min-h-screen w-full overflow-x-clip bg-[var(--stage-bg-base,#060E1C)] text-[#F8FAFC] transition-colors duration-[850ms] ease-in-out"
     >
       {/* Shared Ambient Looping Intelligence Field */}
-      <WorkspaceSplineAmbient entryProgress={1} preferFallback={preferFallback} />
+      <WorkspaceSplineAmbient entryProgress={1} preferFallback={preferFallback} themeKey="midnight" />
 
       {/* TOP BAR */}
-      <header className="relative z-30 border-b border-white/[0.10] bg-[#050312]/70 backdrop-blur-xl">
+      <header className="relative z-30 border-b border-white/[0.10] bg-[var(--stage-header-bg,rgba(9,20,39,0.82))] backdrop-blur-xl transition-colors duration-[850ms]">
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-6 py-2.5 sm:px-10">
           <div className="flex items-center gap-3.5">
             <div className="flex items-center gap-2">
               <span
-                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#4F46E5] via-[#E879F9] to-[#F97316] shadow-[0_0_10px_rgba(249,115,22,0.85)]"
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#112B46] via-[#245A78] to-[#54D6E8] shadow-[0_0_10px_rgba(84,214,232,0.9)]"
                 aria-hidden="true"
               />
               <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
@@ -239,58 +330,17 @@ export const LocationIntelligenceView: React.FC<
               </span>
             </div>
             <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
-            <span className="bg-gradient-to-r from-[#A5B4FC] via-[#E879F9] to-[#FB923C] bg-clip-text text-xs font-semibold text-transparent">
+            <span className="bg-gradient-to-r from-[#54D6E8] via-[#BAE6FD] to-[#DDF6FA] bg-clip-text text-xs font-semibold text-transparent">
               03 / Location Intelligence &amp; Scenario Simulator
             </span>
           </div>
 
-          {/* 4-View Workspace Sequence */}
-          <nav
-            aria-label="LOCUS Workspace Views"
-            className="flex flex-wrap items-center gap-3"
-          >
-            {PROGRESS_STEPS.map((step, index) => (
-              <React.Fragment key={step.code}>
-                <button
-                  type="button"
-                  disabled={step.code === '04' && !onContinueToDecision}
-                  onClick={() => {
-                    if (step.code === '01') onBackToMarketDiscovery();
-                    if (step.code === '02') onBackToGroundReality();
-                    if (step.code === '04' && onContinueToDecision) {
-                      onContinueToDecision({
-                        scenarioAssumptions: assumptions,
-                        comparison,
-                      });
-                    }
-                  }}
-                  className={`inline-flex items-center gap-1.5 text-xs transition-colors ${
-                    step.active
-                      ? 'font-semibold text-white'
-                      : step.code === '01' ||
-                        step.code === '02' ||
-                        (step.code === '04' && onContinueToDecision)
-                      ? 'cursor-pointer text-slate-300 hover:text-white'
-                      : 'cursor-default text-slate-500'
-                  }`}
-                >
-                  <span
-                    className={`font-mono text-[11px] ${
-                      step.active ? 'text-[#FB923C]' : 'text-slate-500'
-                    }`}
-                  >
-                    {step.code}
-                  </span>
-                  <span>{step.label}</span>
-                </button>
-                {index < PROGRESS_STEPS.length - 1 && (
-                  <span className="text-xs text-slate-600" aria-hidden="true">
-                    →
-                  </span>
-                )}
-              </React.Fragment>
-            ))}
-          </nav>
+          {/* 4-View Workspace Sequence Stepper */}
+          <WorkspaceStageNav
+            currentStage="03"
+            onNavigate={handleStageNav}
+            unlockedViews={unlockedViews}
+          />
 
           <div className="flex items-center gap-2">
             <span
@@ -298,20 +348,20 @@ export const LocationIntelligenceView: React.FC<
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold ${
                 handoff.streetScanFusion
                   ? 'border-emerald-400/45 bg-emerald-500/15 text-emerald-200'
-                  : 'border-amber-400/45 bg-amber-500/15 text-amber-200'
+                  : 'border-sky-400/35 bg-sky-500/15 text-sky-200'
               }`}
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  handoff.streetScanFusion ? 'bg-emerald-400' : 'bg-amber-400'
+                  handoff.streetScanFusion ? 'bg-emerald-400' : 'bg-sky-400'
                 }`}
               />
               <span>
                 {handoff.streetScanFusion
                   ? handoff.streetScanFusion.scan_mode === 'LIVE_UPLOAD'
-                    ? 'BASELINE + LIVE STREET SCAN'
-                    : 'BASELINE + DEMO STREET SCAN'
-                  : 'DATABASE BASELINE ONLY (NO STREET SCAN)'}
+                    ? 'MAP + LIVE STREET EVIDENCE'
+                    : 'MAP + DEMO STREET EVIDENCE'
+                  : 'MAP-BASED ASSESSMENT (VIDEO OPTIONAL)'}
               </span>
             </span>
 
@@ -330,6 +380,17 @@ export const LocationIntelligenceView: React.FC<
 
       {/* MAIN WORKSPACE */}
       <div className="relative z-10 mx-auto max-w-[1680px] space-y-4 px-6 py-4 sm:px-10 xl:py-5">
+        {/* Prominent Stage Identity Strip */}
+        <WorkspaceStageHero
+          currentStage="03"
+          candidateName={candidateMeta.label}
+          city={candidateMeta.city}
+          state={candidateMeta.state}
+          businessType={handoff?.profile?.businessType}
+          onNavigate={handleStageNav}
+          unlockedViews={unlockedViews}
+        />
+
         {/* TOP PIPELINE SYNTHESIS BAR: BASELINE -> EVIDENCE -> ANALYSIS -> SCENARIO IMPACT */}
         <div className="liquid-glass-dark rounded-2xl px-4 py-2.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -342,13 +403,13 @@ export const LocationIntelligenceView: React.FC<
                 className={`rounded-lg border px-2.5 py-1 font-mono text-[10px] font-semibold ${
                   handoff.streetScanFusion
                     ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
-                    : 'border-white/10 bg-white/[0.04] text-slate-400'
+                    : 'border-sky-400/30 bg-sky-500/10 text-sky-200'
                 }`}
               >
                 2. GROUND REALITY (
                 {handoff.streetScanFusion
                   ? `${handoff.streetScanFusion.counts.observed_entities} observed, +${handoff.streetScanFusion.counts.additional_signals} signals · OBSERVED`
-                  : 'STREET SCAN NOT AVAILABLE'}
+                  : 'MAP-BASED BASELINE · VIDEO OPTIONAL'}
                 )
               </span>
               <ArrowRight className="h-3.5 w-3.5 text-slate-500" />

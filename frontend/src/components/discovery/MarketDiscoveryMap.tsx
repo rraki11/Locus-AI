@@ -7,6 +7,7 @@ import {
   LOCUS_SPATIAL_RINGS,
   NormalizedBaselinePlace,
   SpatialBandKey,
+  parseAndValidateCoordinates,
 } from '../../data/marketDiscoveryData';
 
 export interface MarketDiscoveryMapProps {
@@ -69,7 +70,12 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
   );
   const [tilesReady, setTilesReady] = useState<boolean>(false);
 
-  const { lat: activeLat, lng: activeLng } = analysis.coordinates;
+  const validCoords = parseAndValidateCoordinates(analysis.coordinates) ?? {
+    lat: 17.4319,
+    lng: 78.4071,
+  };
+  const activeLat = validCoords.lat;
+  const activeLng = validCoords.lng;
   const isResolved = analysis.locationStatus === 'RESOLVED';
   const baselinePlaces: NormalizedBaselinePlace[] =
     analysis.marketBaseline?.places ?? [];
@@ -78,6 +84,7 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container || mapInstanceRef.current) return;
+    if (!Number.isFinite(activeLat) || !Number.isFinite(activeLng)) return;
 
     const initialZoom = isResolved ? 15 : 5;
 
@@ -161,6 +168,8 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
         activeScope === 'ground' ? 17 : activeScope === 'local' ? 15 : 13;
     }
 
+    if (!Number.isFinite(activeLat) || !Number.isFinite(activeLng)) return;
+
     if (preferFallback) {
       map.setView([activeLat, activeLng], targetZoom, { animate: false });
     } else {
@@ -182,32 +191,51 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
   useEffect(() => {
     const group = overlaysGroupRef.current;
     if (!group) return;
+    if (!Number.isFinite(activeLat) || !Number.isFinite(activeLng)) return;
 
     group.clearLayers();
 
     // 1. Local Area Boundary Polygon (when resolved to locality/candidate)
     if (isResolved && analysis.boundaryPolygon.length > 0) {
-      L.polygon(analysis.boundaryPolygon, {
-        color: '#C084FC',
-        weight: 1.2,
-        opacity: 0.48,
-        dashArray: '6 6',
-        fillColor: '#4F46E5',
-        fillOpacity: 0.03,
-        interactive: false,
-      }).addTo(group);
+      const validPolygon = analysis.boundaryPolygon.filter(
+        (pt) =>
+          Array.isArray(pt) &&
+          pt.length >= 2 &&
+          Number.isFinite(pt[0]) &&
+          Number.isFinite(pt[1])
+      );
+      if (validPolygon.length >= 3) {
+        L.polygon(validPolygon, {
+          color: '#C084FC',
+          weight: 1.2,
+          opacity: 0.48,
+          dashArray: '6 6',
+          fillColor: '#4F46E5',
+          fillOpacity: 0.03,
+          interactive: false,
+        }).addTo(group);
+      }
     }
 
     // 2. Arterial Corridors (when available in baseline context)
     if (isResolved) {
       analysis.arterialCorridors.forEach((corridor) => {
-        L.polyline(corridor.path, {
-          color: '#818CF8',
-          weight: 1.8,
-          opacity: 0.34,
-          dashArray: '5 8',
-          interactive: false,
-        }).addTo(group);
+        const validPath = corridor.path.filter(
+          (pt) =>
+            Array.isArray(pt) &&
+            pt.length >= 2 &&
+            Number.isFinite(pt[0]) &&
+            Number.isFinite(pt[1])
+        );
+        if (validPath.length >= 2) {
+          L.polyline(validPath, {
+            color: '#818CF8',
+            weight: 1.8,
+            opacity: 0.34,
+            dashArray: '5 8',
+            interactive: false,
+          }).addTo(group);
+        }
       });
     }
 
@@ -236,6 +264,9 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     // 4A. Normalized Competitor Places from Market Baseline Engine
     if (isResolved && baselinePlaces.length > 0) {
       baselinePlaces.forEach((place, idx) => {
+        if (!Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) {
+          return;
+        }
         const bandStyle = SPATIAL_BAND_MARKER_STYLE[place.spatial_band];
         const showInlineChip =
           place.spatial_band === '0-300m' ||
@@ -315,6 +346,7 @@ export const MarketDiscoveryMap: React.FC<MarketDiscoveryMapProps> = ({
     } else if (isResolved && analysis.surroundingNodes.length > 0) {
       // 4B. Fallback to static anchor nodes if baseline request hasn't completed yet
       analysis.surroundingNodes.forEach((poi) => {
+        if (!Number.isFinite(poi.lat) || !Number.isFinite(poi.lng)) return;
         const color = POI_CATEGORY_COLOR[poi.category];
         const poiIcon = L.divIcon({
           className: 'locus-map-clean-icon',

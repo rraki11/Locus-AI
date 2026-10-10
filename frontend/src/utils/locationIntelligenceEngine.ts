@@ -14,19 +14,40 @@ import {
   ScenarioAssumptions,
 } from '../types/locationIntelligence';
 
+import { parseInrBudget } from './businessProfileInterpreter';
+
 export const BASELINE_SCENARIO_ASSUMPTIONS: ScenarioAssumptions = {
   rentDeltaPct: 0,
   activityDeltaPct: 0,
   competitionDeltaCount: 0,
 };
 
-function parseBudgetBufferScore(budget?: string): number {
-  const clean = (budget || '').trim();
-  if (clean.includes('50L')) return 85;
-  if (clean.includes('30L')) return 70;
-  if (clean.includes('15L')) return 52;
-  if (clean.includes('8L')) return 35;
-  return 55;
+function parseBudgetBufferScore(budget?: string, format?: string): number {
+  const parsed = parseInrBudget(budget);
+  if (!parsed.isValid || parsed.numericValue === null) {
+    return 50; // Neutral baseline when budget is unverified or empty
+  }
+
+  const amt = parsed.numericValue;
+  const isMicroFormat = format === 'stall' || format === 'kiosk' || format === 'home-based';
+
+  // For small vendors (stalls, kiosks), ₹20k - ₹1L has solid capital buffer
+  if (isMicroFormat) {
+    if (amt >= 200000) return 90;
+    if (amt >= 100000) return 82;
+    if (amt >= 50000) return 74;
+    if (amt >= 25000) return 65;
+    if (amt >= 10000) return 55;
+    return 42;
+  }
+
+  // For physical shops and commercial premises
+  if (amt >= 5000000) return 88;
+  if (amt >= 3000000) return 78;
+  if (amt >= 1500000) return 65;
+  if (amt >= 800000) return 52;
+  if (amt >= 300000) return 40;
+  return 32;
 }
 
 /**
@@ -75,9 +96,18 @@ export function evaluateLocationIntelligence(params: {
     : 'CALIBRATED_DEMO_SCAN_FUSED';
 
   // 1. Raw counts from View 1 (Market Baseline) and View 2 (Street Scan Fusion)
-  const base300m = marketBaseline?.bands['0-300m'].count ?? 0;
-  const baseLocal = marketBaseline?.bands['300m-2km'].count ?? 0;
-  const baseWider = marketBaseline?.bands['2-5km'].count ?? 0;
+  const base300m =
+    marketBaseline?.bands?.['0-300m']?.count ??
+    marketBaseline?.bands?.['0-300m']?.places?.length ??
+    0;
+  const baseLocal =
+    marketBaseline?.bands?.['300m-2km']?.count ??
+    marketBaseline?.bands?.['300m-2km']?.places?.length ??
+    0;
+  const baseWider =
+    marketBaseline?.bands?.['2-5km']?.count ??
+    marketBaseline?.bands?.['2-5km']?.places?.length ??
+    0;
   const baseTotal = marketBaseline?.total_mapped ?? base300m + baseLocal + baseWider;
 
   const observedAdditional300m =
@@ -120,7 +150,7 @@ export function evaluateLocationIntelligence(params: {
   );
 
   // Rent pressure index (0..100 scale): higher corridor density increases baseline rent pressure; higher budget lowers strain
-  const budgetBuffer = parseBudgetBufferScore(profile.budget);
+  const budgetBuffer = parseBudgetBufferScore(profile.budget, profile.preferredFormat);
   const rawRentPressure = Math.min(
     92,
     Math.max(
@@ -233,11 +263,11 @@ export function evaluateLocationIntelligence(params: {
 
   // --- FACTOR 4: ACCESSIBILITY ---
   const accessibilityRating: CategoricalLevel =
-    marketBaseline?.factors.accessibility.level ??
+    marketBaseline?.factors?.accessibility?.level ??
     (base300m + baseLocal >= 6 ? 'STRONG' : baseTotal >= 3 ? 'MEDIUM' : 'LOW');
 
   const accessibilityExplanation =
-    marketBaseline?.factors.accessibility.explanation ??
+    marketBaseline?.factors?.accessibility?.explanation ??
     `Derived from mapped commercial frontage along ${
       candidate.local_area || candidate.city
     } street network (${base300m} nodes within 300m walkable ring).`;
@@ -267,9 +297,9 @@ export function evaluateLocationIntelligence(params: {
       : `${base300m} mapped storefronts in the 0–300m Ground Reality ring and ${baseLocal} in the 300m–2km Local Market ring.`;
 
   // --- FACTOR 6: GROUND-LEVEL EVIDENCE ---
-  let groundEvidenceRating: CategoricalLevel = 'LOW';
+  let groundEvidenceRating: CategoricalLevel = 'MEDIUM';
   let groundEvidenceExplanation =
-    'STREET SCAN NOT AVAILABLE: No street-level video has been processed in View 2 yet. Ground-truth verification is pending; current intelligence relies on DATABASE baseline only.';
+    'Map-based assessment: Confirmed commercial listings and street network nodes indexed. Visual storefront detection is an optional enhancement; physical corridor footage has not been provided.';
   let groundEvidenceType: EvidenceType = 'DATABASE';
   const groundSupporting: string[] = [];
 
@@ -301,17 +331,21 @@ export function evaluateLocationIntelligence(params: {
       `OCR: ${streetScanFusion.ocr_engine} (${streetScanFusion.counts.ocr_confirmed_names} confirmed names)`
     );
   } else {
+    groundEvidenceRating = 'MEDIUM';
     groundSupporting.push(
-      'Status: STREET SCAN NOT AVAILABLE (0 frames analyzed)'
+      'Analysis mode: Map-Based Corridor Baseline'
     );
     groundSupporting.push(
-      'Return to 02 / Ground Reality to upload a street clip or run the calibrated demo scan.'
+      `0–300m walking radius: ${base300m} mapped businesses from database registry`
+    );
+    groundSupporting.push(
+      'Optional Street Scan: Can be added in Step 02 for visual storefront confirmation'
     );
   }
 
   // --- FACTOR 7: DATA COVERAGE ---
   let coverageRating: CategoricalLevel =
-    marketBaseline?.data_coverage.level ?? 'MEDIUM';
+    marketBaseline?.data_coverage?.level ?? 'MEDIUM';
   if (streetScanAvailable && dataMode === 'LIVE') {
     coverageRating = 'STRONG';
   } else if (streetScanAvailable && coverageRating === 'MEDIUM') {
@@ -325,16 +359,16 @@ export function evaluateLocationIntelligence(params: {
   const coverageExplanation = streetScanAvailable
     ? `Combines multi-ring ${baselineSourceLabel} (${baseTotal} places across 300m/2km/5km) with 0–300m Street Scan visual evidence (${streetScanFusion?.video_summary.frames_extracted} frames).`
     : `${
-        marketBaseline?.data_coverage.summary ||
+        marketBaseline?.data_coverage?.summary ||
         `${baseTotal} places indexed across 300m, 2km, and 5km rings.`
-      } Ground-level video layer not yet fused.`;
+      } Visual corridor footage is an optional enhancement.`;
 
   // --- FACTOR 8: RISK ---
-  // Risk increases with high rent pressure, high immediate competition, low activity, or missing ground-truth scan
+  // Risk increases with high rent pressure, high immediate competition, or low activity
   const competitionRiskComponent = Math.min(38, effective300mCompetitors * 5.2);
   const rentRiskComponent = effectiveRentPressureIndex * 0.38;
   const lowActivityPenalty = Math.max(0, (60 - effectiveActivityIndex) * 0.45);
-  const unverifiedGroundPenalty = streetScanAvailable ? 0 : 8;
+  const unverifiedGroundPenalty = 0;
   const compositeRiskScore = Math.round(
     competitionRiskComponent +
       rentRiskComponent +
@@ -361,9 +395,9 @@ export function evaluateLocationIntelligence(params: {
       }${assumptions.competitionDeltaCount} competitors yields ${riskRating} exposure (rent pressure index ${effectiveRentPressureIndex}/100, ${effective300mCompetitors} immediate competitors).`
     : `Reflects ${effective300mCompetitors} immediate 0–300m competitors, baseline rent pressure (${effectiveRentPressureIndex}/100 against ${profile.budget} budget), and ${
         streetScanAvailable
-          ? `+${observedAdditional300m} additional street signals`
-          : 'unverified ground-level frontage'
-      }.`;
+          ? `+${observedAdditional300m} additional street signals.`
+          : 'mapped commercial baseline.'
+      }`;
 
   const rawFactors: Omit<
     LocationIntelligenceFactor,
@@ -500,17 +534,27 @@ export function evaluateLocationIntelligence(params: {
     (customerFitRating === 'STRONG' || customerFitRating === 'HIGH') &&
     (riskRating === 'LOW' || riskRating === 'MEDIUM')
   ) {
-    decisionPosture = {
-      posture: 'FAVORABLE ENTRY POSTURE',
-      tone: 'emerald',
-      headline: `Strong commercial activity (${commercialActivityRating}) with manageable competitive and rental exposure (${riskRating} risk).`,
-      rationale: `Analytical estimate indicates ${
-        candidate.local_area || candidate.label
-      } supports a ${profile.businessType} targeting ${
-        profile.targetCustomer
-      } within the ${profile.budget} budget envelope (${effective300mCompetitors} immediate 0–300m competitors).`,
-      evidence_type: isScenario ? 'PREDICTED_ANALYTICAL' : 'INFERRED',
-    };
+    if (!streetScanAvailable) {
+      decisionPosture = {
+        posture: 'FAVORABLE ENTRY POSTURE',
+        tone: 'emerald',
+        headline: `Supportive map-based demand indicators (${commercialActivityRating} activity) with manageable competitive exposure (${riskRating} risk).`,
+        rationale: `Map data indicates commercial presence and favorable category fit for ${profile.businessType} targeting ${profile.targetCustomer} within the ${profile.budget} budget envelope (${effective300mCompetitors} mapped 0–300m businesses). Optional street video can provide additional corridor visual validation.`,
+        evidence_type: isScenario ? 'PREDICTED_ANALYTICAL' : 'DATABASE',
+      };
+    } else {
+      decisionPosture = {
+        posture: 'FAVORABLE ENTRY POSTURE',
+        tone: 'emerald',
+        headline: `Strong commercial activity (${commercialActivityRating}) with manageable competitive and rental exposure (${riskRating} risk).`,
+        rationale: `Observed and structured evidence indicates ${
+          candidate.local_area || candidate.label
+        } supports a ${profile.businessType} targeting ${
+          profile.targetCustomer
+        } within the ${profile.budget} budget envelope (${effective300mCompetitors} reconciled 0–300m competitors).`,
+        evidence_type: isScenario ? 'PREDICTED_ANALYTICAL' : 'INFERRED',
+      };
+    }
   } else if (
     (commercialActivityRating === 'STRONG' ||
       commercialActivityRating === 'HIGH') &&

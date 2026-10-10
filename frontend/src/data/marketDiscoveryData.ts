@@ -34,10 +34,15 @@ export type MapCameraLevel =
   | 'candidate';
 
 export interface BusinessProfileConfig {
+  businessDescription?: string;
   businessType: string;
+  categoryKey?: string;
   targetCustomer: string;
   expansionObjective: string;
   budget: string;
+  preferredFormat?: string;
+  preferredSurroundings?: string;
+  priorities?: string[];
 }
 
 export interface BusinessProfilePresetOptions {
@@ -273,17 +278,22 @@ export const LOCUS_SPATIAL_RINGS: SpatialCatchmentRingSpec[] = [
 
 export const BUSINESS_PROFILE_OPTIONS: BusinessProfilePresetOptions = {
   businessTypes: [
+    'Tea & Snacks Stall',
+    'Stationery & Print Shop',
     'Café',
     'Quick Service Restaurant',
     'Specialty Retail Store',
     'Fitness & Wellness Studio',
     'Bakery & Dessert Bar',
+    'Salon & Grooming Lounge',
+    'Pharmacy & Diagnostics',
   ],
   targetCustomers: [
-    'Students + young professionals',
-    'Office commuters + daytime teams',
-    'Neighborhood families + evening diners',
+    'College & university students',
+    'Office commuters & daytime teams',
+    'Neighborhood families & local residents',
     'High-intent urban retail shoppers',
+    'General neighborhood footfall',
   ],
   expansionObjectives: [
     'First outlet',
@@ -291,14 +301,18 @@ export const BUSINESS_PROFILE_OPTIONS: BusinessProfilePresetOptions = {
     'Flagship street frontage',
     'High-density commuter hub',
   ],
-  budgets: ['₹15L', '₹25L', '₹45L', '₹80L'],
+  budgets: ['₹30,000', '₹50,000', '₹15L', '₹25L', '₹45L', '₹80L'],
 };
 
 export const DEFAULT_DISCOVERY_BUSINESS_PROFILE: BusinessProfileConfig = {
-  businessType: 'Café',
-  targetCustomer: 'Students + young professionals',
+  businessDescription: '',
+  businessType: 'Tea & Snacks Stall',
+  targetCustomer: 'College & university students',
   expansionObjective: 'First outlet',
-  budget: '₹15L',
+  budget: '',
+  preferredFormat: 'stall',
+  preferredSurroundings: 'Near college / educational institutions',
+  priorities: ['low rent', 'customer demand'],
 };
 
 /**
@@ -1297,6 +1311,60 @@ export async function fetchMarketBaseline(params: {
 }
 
 /**
+ * Robustly parses and validates latitude and longitude coordinates.
+ * Accepts any object with lat/lng or latitude/longitude properties, or primitive numbers.
+ * Validates that numbers are finite and within Earth bounds (-90..90, -180..180).
+ * Returns normalized { lat, lng } rounded to 5 decimal places, or null if invalid.
+ */
+export function parseAndValidateCoordinates(
+  raw: unknown
+): { lat: number; lng: number } | null {
+  if (raw === null || raw === undefined) return null;
+
+  let rawLat: unknown;
+  let rawLng: unknown;
+
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    rawLat =
+      obj.lat ??
+      obj.latitude ??
+      (obj.coordinates && typeof obj.coordinates === 'object'
+        ? (obj.coordinates as Record<string, unknown>).lat ??
+          (obj.coordinates as Record<string, unknown>).latitude
+        : undefined);
+    rawLng =
+      obj.lng ??
+      obj.longitude ??
+      (obj.coordinates && typeof obj.coordinates === 'object'
+        ? (obj.coordinates as Record<string, unknown>).lng ??
+          (obj.coordinates as Record<string, unknown>).longitude
+        : undefined);
+  } else {
+    return null;
+  }
+
+  const lat = typeof rawLat === 'number' ? rawLat : parseFloat(String(rawLat));
+  const lng = typeof rawLng === 'number' ? rawLng : parseFloat(String(rawLng));
+
+  if (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  ) {
+    return {
+      lat: Number(lat.toFixed(5)),
+      lng: Number(lng.toFixed(5)),
+    };
+  }
+
+  return null;
+}
+
+/**
  * Derives the location-specific analysis context for any State, City, Local Area, and Candidate Coordinate.
  */
 export function resolveLocationAnalysis(params: {
@@ -1317,7 +1385,7 @@ export function resolveLocationAnalysis(params: {
     state,
     city,
     localArea,
-    coordinates,
+    coordinates: rawCoordinates,
     hasUserSelectedLocation,
     cameraLevel,
     customCandidateLabel,
@@ -1327,6 +1395,13 @@ export function resolveLocationAnalysis(params: {
     isAnalyzing = false,
     marketBaseline = null,
   } = params;
+
+  // Defensive validation of candidate coordinates:
+  const validatedCoords = parseAndValidateCoordinates(rawCoordinates);
+  const coordinates = validatedCoords ?? {
+    lat: DEMO_LOCATION_PRESETS[0].lat,
+    lng: DEMO_LOCATION_PRESETS[0].lng,
+  };
 
   const formattedLat = `${Math.abs(coordinates.lat).toFixed(4)}° ${
     coordinates.lat >= 0 ? 'N' : 'S'

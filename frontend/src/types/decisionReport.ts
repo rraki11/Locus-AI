@@ -51,6 +51,30 @@ export interface FinalPostureReason {
   evidence_type: EvidenceType;
 }
 
+export type PlainLanguageOutcome =
+  | 'LOOKS PROMISING'
+  | 'POSSIBLE, WITH SOME RISKS'
+  | 'CONSIDER ANOTHER LOCATION'
+  | 'NOT ENOUGH INFORMATION YET';
+
+export type AnalysisMode = 'MAP_BASED' | 'MAP_AND_STREET';
+
+export interface EvidenceCoverageSummary {
+  business_listings: 'AVAILABLE' | 'DEMO_BASELINE' | 'UNAVAILABLE';
+  business_listings_label: string;
+  geographic_context: 'AVAILABLE' | 'UNAVAILABLE';
+  geographic_context_label: string;
+  street_visual_evidence: 'AVAILABLE' | 'NOT_PROVIDED';
+  street_visual_evidence_label: string;
+  rent_operating_costs: 'VERIFIED' | 'USER_PROVIDED' | 'UNKNOWN';
+  rent_operating_costs_label: string;
+}
+
+export interface PlainLanguageReasonItem {
+  point: string;
+  source_tag: string;
+}
+
 export interface MarketEntryReportData {
   generated_at: string;
   data_mode: 'LIVE' | 'DEMO';
@@ -72,6 +96,34 @@ export interface MarketEntryReportData {
     engine_posture_level: DecisionPostureLevel;
     posture_headline: string;
     posture_evidence_type: EvidenceType;
+  };
+
+  /** 0. PLAIN-LANGUAGE EXECUTIVE SUMMARY (TOP OF VIEW 04 FOR ORDINARY USERS & JUDGES) */
+  executiveSummary: {
+    outcome: PlainLanguageOutcome;
+    outcome_theme: 'emerald' | 'amber' | 'rose' | 'slate';
+    analysis_mode: AnalysisMode;
+    mode_label: 'MAP-BASED ASSESSMENT' | 'MAP + STREET EVIDENCE';
+    scope_explanation: string;
+    evidence_coverage: EvidenceCoverageSummary;
+    plain_explanation: string;
+    why_it_may_work: PlainLanguageReasonItem[];
+    what_could_go_wrong: PlainLanguageReasonItem[];
+    what_to_do_before_spending: string;
+    is_provisional: boolean;
+    confidence_label: string;
+    provisional_reason: string;
+    key_supporting_signals: {
+      label: string;
+      detail: string;
+      evidence_type: EvidenceType;
+    }[];
+    key_risks_or_gaps: {
+      label: string;
+      detail: string;
+      evidence_type: EvidenceType;
+    }[];
+    next_validation_step: string;
   };
 
   /** 2. MARKET OVERVIEW */
@@ -107,7 +159,8 @@ export interface MarketEntryReportData {
     status_badge:
       | 'LIVE STREET SCAN EXECUTED'
       | 'CALIBRATED DEMO SCAN EXECUTED'
-      | 'DATABASE BASELINE ONLY';
+      | 'DATABASE BASELINE ONLY'
+      | 'MAP-BASED BASELINE';
     corridor_scope_statement: string;
     unavailable_explanation?: string;
     scan_metadata?: {

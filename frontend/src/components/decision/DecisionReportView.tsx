@@ -1,17 +1,29 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Compass,
   FileText,
   Printer,
   ShieldAlert,
   Sliders,
+  Sparkles,
 } from 'lucide-react';
 import { WorkspaceSplineAmbient } from '../discovery/WorkspaceSplineAmbient';
 import { MarketDiscoveryMap } from '../discovery/MarketDiscoveryMap';
 import {
+  WorkspaceStageHero,
+  WorkspaceStageNav,
+  WorkspaceViewKey,
+} from '../common/WorkspaceStageNav';
+import {
   CategoricalLevel,
+  DEMO_LOCATION_PRESETS,
+  parseAndValidateCoordinates,
   resolveLocationAnalysis,
 } from '../../data/marketDiscoveryData';
 import { EvidenceType } from '../../types/streetScan';
@@ -27,14 +39,9 @@ export interface DecisionReportViewProps {
   onBackToMarketDiscovery: () => void;
   onBackToGroundReality: () => void;
   onBackToIntelligence: () => void;
+  unlockedViews?: Set<WorkspaceViewKey>;
+  onNavigateToView?: (targetView: WorkspaceViewKey) => void;
 }
-
-const PROGRESS_STEPS = [
-  { code: '01', label: 'Market Discovery', active: false },
-  { code: '02', label: 'Ground Reality', active: false },
-  { code: '03', label: 'Intelligence', active: false },
-  { code: '04', label: 'Decision', active: true },
-] as const;
 
 const EVIDENCE_BADGE_STYLE: Record<
   EvidenceType,
@@ -102,31 +109,111 @@ const SHORT_POSTURE_STYLE: Record<
   },
 };
 
+const PLAIN_OUTCOME_THEME_STYLE: Record<
+  'emerald' | 'amber' | 'rose' | 'slate',
+  { border: string; pill: string; badge: string; text: string; bg: string }
+> = {
+  emerald: {
+    border: 'border-emerald-400/40 bg-emerald-500/[0.07]',
+    pill: 'border-emerald-400/50 bg-emerald-500/20 text-emerald-200',
+    badge: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300',
+    text: 'text-emerald-300',
+    bg: 'bg-emerald-500/[0.04]',
+  },
+  amber: {
+    border: 'border-amber-400/40 bg-amber-500/[0.08]',
+    pill: 'border-amber-400/50 bg-amber-500/20 text-amber-200',
+    badge: 'border-amber-400/40 bg-amber-500/15 text-amber-300',
+    text: 'text-amber-300',
+    bg: 'bg-amber-500/[0.04]',
+  },
+  rose: {
+    border: 'border-rose-400/45 bg-rose-500/[0.09]',
+    pill: 'border-rose-400/50 bg-rose-500/20 text-rose-200',
+    badge: 'border-rose-400/40 bg-rose-500/15 text-rose-300',
+    text: 'text-rose-300',
+    bg: 'bg-rose-500/[0.04]',
+  },
+  slate: {
+    border: 'border-slate-500/40 bg-slate-500/[0.08]',
+    pill: 'border-slate-400/50 bg-slate-500/20 text-slate-200',
+    badge: 'border-slate-400/40 bg-slate-500/15 text-slate-300',
+    text: 'text-slate-300',
+    bg: 'bg-slate-500/[0.04]',
+  },
+};
+
 export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
   handoff,
   preferFallback = false,
   onBackToMarketDiscovery,
   onBackToGroundReality,
   onBackToIntelligence,
+  unlockedViews,
+  onNavigateToView,
 }) => {
   const report = useMemo(() => buildMarketEntryReport(handoff), [handoff]);
+
+  const safeCoords = useMemo(() => {
+    return (
+      parseAndValidateCoordinates(handoff?.coordinates) ?? {
+        lat: DEMO_LOCATION_PRESETS[0].lat,
+        lng: DEMO_LOCATION_PRESETS[0].lng,
+      }
+    );
+  }, [handoff?.coordinates]);
 
   const mapAnalysis = useMemo(
     () =>
       resolveLocationAnalysis({
-        state: handoff?.state ?? '',
-        city: handoff?.city ?? '',
-        localArea: handoff?.localArea ?? '',
-        coordinates: handoff?.coordinates ?? { lat: 12.9352, lng: 77.6245 },
+        state: handoff?.state || DEMO_LOCATION_PRESETS[0].state,
+        city: handoff?.city || DEMO_LOCATION_PRESETS[0].city,
+        localArea: handoff?.localArea || DEMO_LOCATION_PRESETS[0].localArea,
+        coordinates: safeCoords,
         hasUserSelectedLocation: true,
         cameraLevel: 'candidate',
-        customCandidateLabel: handoff?.candidateName,
+        customCandidateLabel: handoff?.candidateName || DEMO_LOCATION_PRESETS[0].candidateName,
         marketBaseline: handoff?.marketBaseline,
       }),
-    [handoff]
+    [handoff, safeCoords]
   );
 
   const postureStyle = SHORT_POSTURE_STYLE[report.summary.short_posture];
+  const outcomeStyle =
+    PLAIN_OUTCOME_THEME_STYLE[report.executiveSummary.outcome_theme] ??
+    PLAIN_OUTCOME_THEME_STYLE.amber;
+
+  const handleStageNav = useCallback(
+    (target: WorkspaceViewKey) => {
+      if (target === 'view1') {
+        onBackToMarketDiscovery();
+      } else if (target === 'view2') {
+        onBackToGroundReality();
+      } else if (target === 'view3') {
+        onBackToIntelligence();
+      } else if (onNavigateToView) {
+        onNavigateToView(target);
+      }
+    },
+    [
+      onBackToMarketDiscovery,
+      onBackToGroundReality,
+      onBackToIntelligence,
+      onNavigateToView,
+    ]
+  );
+
+  const [isLedgerOpen, setIsLedgerOpen] = useState<boolean>(true);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      const raf = requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, []);
 
   const handlePrintReport = () => {
     if (typeof window !== 'undefined' && typeof window.print === 'function') {
@@ -138,21 +225,25 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
     <section
       aria-label="Page 3 — View 4: Explainable Market Entry Decision Report"
       data-testid="decision-report-view"
-      className="relative min-h-screen w-full overflow-hidden bg-[#03020A] text-[#F8FAFC]"
+      className="relative min-h-screen w-full overflow-x-clip bg-[var(--stage-bg-base,#081713)] text-[#F8FAFC] transition-colors duration-[850ms] ease-in-out print:min-h-0 print:!bg-[#F8FBF9] print:!text-[#14231E] print:overflow-visible"
     >
-      {/* Shared Ambient Looping Intelligence Field */}
-      <WorkspaceSplineAmbient
-        entryProgress={1}
-        preferFallback={preferFallback}
-      />
+      {/* Shared Continuous Looping Ambient Intelligence Field (Screen only) */}
+      <div className="print:hidden">
+        <WorkspaceSplineAmbient
+          entryProgress={1}
+          preferFallback={preferFallback}
+          fixedViewport={true}
+          themeKey="report"
+        />
+      </div>
 
       {/* TOP BAR */}
-      <header className="relative z-30 border-b border-white/[0.10] bg-[#050312]/75 backdrop-blur-xl print:hidden">
+      <header className="relative z-30 border-b border-white/[0.10] bg-[var(--stage-header-bg,rgba(6,25,20,0.85))] backdrop-blur-xl transition-colors duration-[850ms] print:hidden">
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-6 py-2.5 sm:px-10">
           <div className="flex items-center gap-3.5">
             <div className="flex items-center gap-2">
               <span
-                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#4F46E5] via-[#E879F9] to-[#F97316] shadow-[0_0_10px_rgba(249,115,22,0.85)]"
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#092D25] via-[#0F8B68] to-[#72D9B0] shadow-[0_0_10px_rgba(114,217,176,0.9)]"
                 aria-hidden="true"
               />
               <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
@@ -160,48 +251,17 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
               </span>
             </div>
             <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
-            <span className="bg-gradient-to-r from-[#A5B4FC] via-[#E879F9] to-[#FB923C] bg-clip-text text-xs font-semibold text-transparent">
+            <span className="bg-gradient-to-r from-[#72D9B0] via-[#0F8B68] to-[#E9F7F0] bg-clip-text text-xs font-semibold text-transparent">
               04 / Decision — Explainable Market Entry Report
             </span>
           </div>
 
-          {/* 4-View Workspace Sequence */}
-          <nav
-            aria-label="LOCUS Workspace Views"
-            className="flex flex-wrap items-center gap-3"
-          >
-            {PROGRESS_STEPS.map((step, index) => (
-              <React.Fragment key={step.code}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (step.code === '01') onBackToMarketDiscovery();
-                    if (step.code === '02') onBackToGroundReality();
-                    if (step.code === '03') onBackToIntelligence();
-                  }}
-                  className={`inline-flex items-center gap-1.5 text-xs transition-colors ${
-                    step.active
-                      ? 'font-semibold text-white'
-                      : 'cursor-pointer text-slate-300 hover:text-white'
-                  }`}
-                >
-                  <span
-                    className={`font-mono text-[11px] ${
-                      step.active ? 'text-[#FB923C]' : 'text-slate-500'
-                    }`}
-                  >
-                    {step.code}
-                  </span>
-                  <span>{step.label}</span>
-                </button>
-                {index < PROGRESS_STEPS.length - 1 && (
-                  <span className="text-xs text-slate-600" aria-hidden="true">
-                    →
-                  </span>
-                )}
-              </React.Fragment>
-            ))}
-          </nav>
+          {/* 4-View Workspace Sequence Stepper */}
+          <WorkspaceStageNav
+            currentStage="04"
+            onNavigate={handleStageNav}
+            unlockedViews={unlockedViews}
+          />
 
           <div className="flex items-center gap-2">
             <button
@@ -228,7 +288,289 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
       </header>
 
       {/* MAIN REPORT DOCUMENT CONTAINER */}
-      <div className="relative z-10 mx-auto max-w-[1680px] space-y-5 px-6 py-5 sm:px-10">
+      <div className="relative z-10 mx-auto max-w-[1680px] space-y-5 px-6 py-5 sm:px-10 print:max-w-none print:p-0 print:m-0 print:space-y-2">
+        {/* DEDICATED PRINT REPORT HEADER (Only renders during print / PDF export) */}
+        <div className="hidden print-report-header">
+          <div className="flex items-center gap-3">
+            <span className="font-display text-lg font-bold tracking-wider text-[#092D25]">
+              LOCUS AI
+            </span>
+            <span className="text-xs font-semibold text-[#0F8B68] font-mono">
+              EXPLAINABLE MARKET ENTRY REPORT
+            </span>
+          </div>
+          <div className="text-right font-mono text-[9pt] text-[#475569]">
+            <div><strong>Candidate:</strong> {report.summary.candidate_location} ({report.summary.city}, {report.summary.state})</div>
+            <div><strong>Profile:</strong> {report.summary.business_type} · <strong>Budget:</strong> {report.summary.budget}</div>
+          </div>
+        </div>
+
+        {/* Prominent Stage Identity Strip */}
+        <div className="print:hidden">
+          <WorkspaceStageHero
+            currentStage="04"
+            candidateName={report.summary.candidate_location}
+            city={report.summary.city}
+            state={report.summary.state}
+            businessType={report.summary.business_type}
+            onNavigate={handleStageNav}
+            unlockedViews={unlockedViews}
+          />
+        </div>
+        {/* ============================================================
+            EXECUTIVE SUMMARY (TOP OF VIEW 04: PLAIN-LANGUAGE EXECUTIVE BRIEF)
+           ============================================================ */}
+        <section
+          data-testid="report-executive-summary"
+          aria-label="Executive Decision Summary"
+          className={`liquid-glass-dark rounded-3xl border p-5 sm:p-7 space-y-6 ${outcomeStyle.border} shadow-[0_20px_50px_rgba(0,0,0,0.6)] print:p-3 print:space-y-2 print:rounded-xl print:shadow-none print:break-inside-avoid print:break-after-page`}
+        >
+          {/* Header Row: Location, Business Type, Direct Plain-Language Decision */}
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start border-b border-white/[0.08] pb-5 print:flex-row print:items-start print:gap-3 print:pb-2">
+            <div className="space-y-2.5 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-[#F59E0B]/50 bg-[#F59E0B]/15 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#FCD34D]">
+                  <Sparkles className="h-3 w-3" />
+                  PLAIN-LANGUAGE SUMMARY · EXECUTIVE BRIEF
+                </span>
+                <span
+                  data-testid="executive-confidence-pill"
+                  className={`rounded-md border px-2.5 py-0.5 font-mono text-[9.5px] font-semibold ${
+                    report.executiveSummary.is_provisional
+                      ? 'border-amber-400/40 bg-amber-500/20 text-amber-200'
+                      : 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200'
+                  }`}
+                >
+                  {report.executiveSummary.confidence_label}
+                </span>
+                <span
+                  data-testid="executive-mode-pill"
+                  className={`rounded-md border px-2.5 py-0.5 font-mono text-[9.5px] font-semibold ${
+                    report.executiveSummary.analysis_mode === 'MAP_AND_STREET'
+                      ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200'
+                      : 'border-indigo-400/40 bg-indigo-500/20 text-indigo-200'
+                  }`}
+                >
+                  {report.executiveSummary.mode_label}
+                </span>
+              </div>
+
+              <div>
+                <h1 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                  {report.summary.candidate_location} —{' '}
+                  <span className="text-[#FCD34D]">{report.summary.business_type}</span>
+                </h1>
+                <p className="font-mono text-xs text-slate-400 mt-1">
+                  Budget: <span className="text-slate-200">{report.summary.budget}</span> · Target Customers: <span className="text-slate-200">{report.summary.target_customer}</span> · Format: <span className="text-slate-200">{report.summary.expansion_objective}</span>
+                </p>
+                <p className="font-mono text-[11px] text-slate-300/80 mt-1.5 flex items-center gap-1.5">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                  <span>{report.executiveSummary.scope_explanation}</span>
+                </p>
+              </div>
+
+              {/* Direct Plain-Language Decision Answer */}
+              <div className="pt-1">
+                <span
+                  data-testid="executive-posture-badge"
+                  className={`inline-block rounded-xl border px-3.5 py-1.5 font-mono text-sm sm:text-base font-extrabold tracking-wide ${outcomeStyle.pill}`}
+                >
+                  {report.executiveSummary.outcome}
+                </span>
+              </div>
+
+              {/* Clear narrative explanation answering the 4 questions in everyday language */}
+              <p className="max-w-4xl text-xs sm:text-sm leading-relaxed text-slate-200 font-medium">
+                {report.executiveSummary.plain_explanation}
+              </p>
+
+              {report.executiveSummary.is_provisional && (
+                <p className="text-[11.5px] leading-relaxed text-amber-300/90 font-mono flex items-center gap-1.5 pt-0.5">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                  <span>{report.executiveSummary.provisional_reason}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Quick Analytical Context Sub-box */}
+            <div className="flex flex-col items-start rounded-2xl border border-white/15 bg-[#050312]/85 p-3.5 lg:items-end shrink-0 shadow-lg">
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-slate-400">
+                ANALYTICAL POSTURE
+              </span>
+              <div className="mt-1 flex items-center gap-2">
+                <span className={`rounded-xl border px-3 py-1 font-mono text-xs font-bold tracking-wider ${postureStyle.pill}`}>
+                  {report.summary.short_posture}
+                </span>
+              </div>
+              <span className="mt-1 font-mono text-[10px] text-slate-300">
+                {report.summary.engine_posture_level}
+              </span>
+            </div>
+          </div>
+
+          {/* Three Compact, Readable Groups: Why it may work, What could go wrong, What to do first */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 print:grid-cols-3 print:gap-2">
+            {/* 1. WHY THIS LOCATION MAY WORK */}
+            <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/[0.04] p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span>Why This Location May Work</span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {report.executiveSummary.why_it_may_work.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-emerald-400/20 bg-black/30 p-2.5 space-y-1"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="font-mono text-xs font-bold text-emerald-400 shrink-0">
+                          0{idx + 1}.
+                        </span>
+                        <p className="text-xs leading-relaxed text-slate-100 font-medium">
+                          {item.point}
+                        </p>
+                      </div>
+                      <div className="pl-5">
+                        <span className="inline-block rounded border border-emerald-400/30 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[8.5px] font-semibold text-emerald-200">
+                          {item.source_tag}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. WHAT COULD GO WRONG */}
+            <div className="rounded-2xl border border-amber-400/25 bg-amber-500/[0.04] p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                  <ShieldAlert className="h-4 w-4 text-amber-400 shrink-0" />
+                  <span>What Could Go Wrong</span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {report.executiveSummary.what_could_go_wrong.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-amber-400/20 bg-black/30 p-2.5 space-y-1"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="font-mono text-xs font-bold text-amber-400 shrink-0">
+                          !
+                        </span>
+                        <p className="text-xs leading-relaxed text-slate-100 font-medium">
+                          {item.point}
+                        </p>
+                      </div>
+                      <div className="pl-4">
+                        <span className="inline-block rounded border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[8.5px] font-semibold text-amber-200">
+                          {item.source_tag}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. WHAT TO DO BEFORE SPENDING MONEY */}
+            <div className="rounded-2xl border border-[#FB923C]/35 bg-[linear-gradient(135deg,rgba(251,146,60,0.1)_0%,rgba(192,132,252,0.06)_100%)] p-4 flex flex-col justify-between space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider text-[#FDBA74]">
+                  <Compass className="h-4 w-4 text-[#FB923C] shrink-0" />
+                  <span>What To Do Before Spending Money</span>
+                </div>
+
+                <div className="rounded-xl border border-[#FB923C]/30 bg-black/40 p-3 space-y-2">
+                  <span className="inline-block rounded border border-[#FB923C]/40 bg-[#FB923C]/15 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-[#FED7AA]">
+                    Priority Next Action
+                  </span>
+                  <p className="text-xs leading-relaxed text-slate-100 font-medium">
+                    {report.executiveSummary.what_to_do_before_spending}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2 text-[11px] text-slate-300 font-mono">
+                Verification advice personalized to your target budget and format.
+              </div>
+            </div>
+          </div>
+
+          {/* Neutral Evidence Coverage Summary (Explicitly separates data coverage from recommendation quality) */}
+          <div
+            data-testid="evidence-coverage-summary-grid"
+            className="rounded-2xl border border-white/[0.10] bg-white/[0.025] p-4 space-y-2.5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-2">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                Evidence Coverage Summary
+              </span>
+              <span className="font-mono text-[9.5px] text-slate-400">
+                Independent coverage metrics across four operational dimensions
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 font-mono text-xs print:grid-cols-4 print:gap-1.5">
+              <div className="rounded-xl border border-white/[0.07] bg-black/30 p-2.5 space-y-1">
+                <span className="block text-[9.5px] uppercase tracking-wider text-slate-400">
+                  Business listings
+                </span>
+                <span className="block font-semibold text-slate-100">
+                  {report.executiveSummary.evidence_coverage.business_listings_label}
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.07] bg-black/30 p-2.5 space-y-1">
+                <span className="block text-[9.5px] uppercase tracking-wider text-slate-400">
+                  Geographic context
+                </span>
+                <span className="block font-semibold text-slate-100">
+                  {report.executiveSummary.evidence_coverage.geographic_context_label}
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.07] bg-black/30 p-2.5 space-y-1">
+                <span className="block text-[9.5px] uppercase tracking-wider text-slate-400">
+                  Street-level visual evidence
+                </span>
+                <span className="block font-semibold text-slate-100">
+                  {report.executiveSummary.evidence_coverage.street_visual_evidence_label}
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.07] bg-black/30 p-2.5 space-y-1">
+                <span className="block text-[9.5px] uppercase tracking-wider text-slate-400">
+                  Rent &amp; operating costs
+                </span>
+                <span className="block font-semibold text-slate-100">
+                  {report.executiveSummary.evidence_coverage.rent_operating_costs_label}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Jump Anchor to Detailed 9-Section Audit */}
+          <div className="pt-2 border-t border-white/[0.07] flex flex-wrap items-center justify-between gap-3">
+            <span className="font-mono text-[10.5px] text-slate-400">
+              Target: {report.summary.city}, {report.summary.state} · Envelope: {report.summary.budget} · Audience: {report.summary.target_customer}
+            </span>
+            <a
+              href="#detailed-analytical-report"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.04] px-3 py-1 font-mono text-[10.5px] font-semibold text-slate-300 hover:border-white/30 hover:text-white transition-colors"
+            >
+              <span>Review detailed technical evidence below (9 sections)</span>
+              <ArrowDown className="h-3 w-3 text-[#FB923C]" />
+            </a>
+          </div>
+        </section>
+
+        {/* Anchor for Smooth Jump */}
+        <div id="detailed-analytical-report" className="pt-2" />
+
         {/* ============================================================
             SECTION 1: MARKET ENTRY SUMMARY (TOP HEADER)
            ============================================================ */}
@@ -577,24 +919,32 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 ) : (
                   <div
                     data-testid="report-ground-reality-unavailable"
-                    className="rounded-2xl border border-amber-400/35 bg-amber-500/[0.08] p-4 space-y-2"
+                    className="rounded-2xl border border-indigo-400/25 bg-indigo-500/[0.05] p-4 space-y-3"
                   >
-                    <div className="flex items-center gap-2 font-mono text-xs font-bold text-amber-200">
-                      <AlertTriangle className="h-4 w-4 text-amber-300" />
-                      <span>DATABASE BASELINE ONLY</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-mono text-xs font-bold text-indigo-200">
+                        <span className="h-2 w-2 rounded-full bg-indigo-400" />
+                        <span>MAP-BASED CORRIDOR BASELINE</span>
+                      </div>
+                      <span className="rounded border border-indigo-400/30 bg-indigo-500/10 px-2 py-0.5 font-mono text-[9px] text-indigo-200">
+                        OPTIONAL STREET SCAN NOT RUN
+                      </span>
                     </div>
-                    <p className="text-xs leading-relaxed text-amber-100/90">
-                      {report.groundReality.unavailable_explanation} No
-                      observed entities or storefront OCR signals have been
-                      fabricated.
+                    <p className="text-xs leading-relaxed text-slate-200">
+                      {report.groundReality.unavailable_explanation} Analysis is conducted using structured geospatial records, public commercial density, and customer profiles.
                     </p>
-                    <button
-                      type="button"
-                      onClick={onBackToGroundReality}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/40 bg-amber-500/20 px-2.5 py-1 font-mono text-[10px] font-semibold text-amber-100 hover:bg-amber-500/30"
-                    >
-                      <span>Go to 02 / Ground Reality to run Street Scan →</span>
-                    </button>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-indigo-400/15 font-mono text-[10.5px]">
+                      <span className="text-slate-400">
+                        Want street-level signage and footfall counts?
+                      </span>
+                      <button
+                        type="button"
+                        onClick={onBackToGroundReality}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300/40 bg-indigo-500/20 px-2.5 py-1 font-mono text-[10px] font-semibold text-indigo-100 hover:bg-indigo-500/30 transition-colors"
+                      >
+                        <span>Enhance with Street Scan (Optional) →</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -965,7 +1315,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
         {/* SECTION 7: EVIDENCE LEDGER */}
         <section
           data-testid="report-section-evidence-ledger"
-          className="liquid-glass-dark rounded-3xl p-5 space-y-4"
+          className="liquid-glass-dark rounded-3xl p-5 space-y-4 print-page-break-before"
         >
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
             <div>
@@ -976,13 +1326,28 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 Traceable Multi-Source Evidence Table
               </h2>
             </div>
-            <span className="font-mono text-[10px] text-slate-400">
-              {report.evidenceLedger.length} logged evidence items
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-slate-400">
+                {report.evidenceLedger.length} logged evidence items
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsLedgerOpen((prev) => !prev)}
+                className="liquid-glass-control inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-mono text-[10px] font-semibold text-slate-200 hover:text-white"
+              >
+                <span>{isLedgerOpen ? 'Collapse Table' : 'Expand Table'}</span>
+                {isLedgerOpen ? (
+                  <ChevronUp className="h-3 w-3 text-slate-400" />
+                ) : (
+                  <ChevronDown className="h-3 w-3 text-slate-400" />
+                )}
+              </button>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-xs">
+          {isLedgerOpen ? (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
               <thead>
                 <tr className="border-b border-white/[0.10] font-mono text-[10px] uppercase tracking-wider text-slate-400">
                   <th className="py-2.5 pr-4">Evidence</th>
@@ -1025,6 +1390,13 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
               </tbody>
             </table>
           </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-center">
+              <p className="font-mono text-xs text-slate-400">
+                Evidence ledger table collapsed. Click &quot;Expand Table&quot; above to inspect all {report.evidenceLedger.length} verified evidence items.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* SECTION 8 & SECTION 9 SIDE-BY-SIDE */}
@@ -1152,6 +1524,12 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
               </p>
             </div>
           </section>
+        </div>
+
+        {/* DEDICATED PRINT REPORT FOOTER */}
+        <div className="hidden print-report-footer">
+          <div>LOCUS AI Multi-Modal Spatial Engine · Findings depend on available geospatial registries &amp; specified assumptions.</div>
+          <div>Report Generated: {new Date(report.summary.analysis_timestamp).toLocaleDateString()}</div>
         </div>
       </div>
     </section>

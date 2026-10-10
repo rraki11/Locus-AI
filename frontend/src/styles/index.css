@@ -44,66 +44,68 @@
       inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
   }
 
-  /* Dark Spatial Intelligence Primary Liquid Glass (Indigo / Rose-Violet / Warm Amber Looping Vibe) */
+  /* Liquid Glass Surfaces with Smooth 850ms Theme Transitions */
   .liquid-glass-dark {
     background:
       radial-gradient(
         120% 90% at 15% 0%,
-        rgba(192, 132, 252, 0.12) 0%,
-        rgba(79, 70, 229, 0.08) 42%,
-        rgba(6, 5, 18, 0) 78%
+        var(--stage-ambient-accent, rgba(114, 217, 176, 0.14)) 0%,
+        var(--stage-ambient-primary, rgba(15, 139, 104, 0.10)) 42%,
+        rgba(4, 16, 13, 0) 78%
       ),
       radial-gradient(
         95% 80% at 88% 100%,
-        rgba(249, 115, 22, 0.09) 0%,
-        rgba(217, 70, 239, 0.05) 45%,
-        rgba(6, 5, 18, 0) 80%
+        var(--stage-ambient-secondary, rgba(9, 45, 37, 0.18)) 0%,
+        var(--stage-ambient-primary, rgba(15, 139, 104, 0.08)) 45%,
+        rgba(4, 16, 13, 0) 80%
       ),
       linear-gradient(
         155deg,
-        rgba(12, 10, 28, 0.56) 0%,
-        rgba(6, 5, 16, 0.48) 100%
+        var(--stage-card-bg, rgba(9, 45, 37, 0.65)) 0%,
+        rgba(5, 20, 16, 0.58) 100%
       );
     backdrop-filter: blur(28px) saturate(160%);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
-    border-top: 1px solid rgba(216, 180, 254, 0.28);
-    border-left: 1px solid rgba(129, 140, 248, 0.24);
-    border-right: 1px solid rgba(251, 146, 60, 0.14);
-    border-bottom: 1px solid rgba(251, 146, 60, 0.12);
+    border-top: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.30));
+    border-left: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.22));
+    border-right: 1px solid rgba(255, 255, 255, 0.10);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow:
-      0 28px 64px -18px rgba(2, 1, 8, 0.84),
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.20),
-      inset 0 -12px 28px -12px rgba(249, 115, 22, 0.07);
+      0 28px 64px -18px rgba(0, 0, 0, 0.75),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
+    transition: background 850ms ease-in-out, border-color 850ms ease-in-out, box-shadow 850ms ease-in-out;
   }
 
   /* Secondary Floating Control Glass (Map HUD & Navigation) */
   .liquid-glass-control {
     background: linear-gradient(
       145deg,
-      rgba(16, 13, 36, 0.80) 0%,
-      rgba(8, 7, 20, 0.72) 100%
+      var(--stage-header-bg, rgba(6, 25, 20, 0.85)) 0%,
+      rgba(4, 16, 13, 0.78) 100%
     );
     backdrop-filter: blur(20px) saturate(150%);
     -webkit-backdrop-filter: blur(20px) saturate(150%);
-    border-top: 1px solid rgba(216, 180, 254, 0.26);
-    border-left: 1px solid rgba(129, 140, 248, 0.20);
-    border-right: 1px solid rgba(251, 146, 60, 0.12);
+    border-top: 1px solid var(--stage-header-border, rgba(114, 217, 176, 0.28));
+    border-left: 1px solid var(--stage-header-border, rgba(114, 217, 176, 0.20));
+    border-right: 1px solid rgba(255, 255, 255, 0.10);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow:
-      0 14px 32px -10px rgba(2, 1, 8, 0.78),
+      0 14px 32px -10px rgba(0, 0, 0, 0.68),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+    transition: background 850ms ease-in-out, border-color 850ms ease-in-out;
   }
 
   /* Tertiary Subtle Recessed Input / Metadata Surface */
   .liquid-glass-subtle {
-    background: rgba(8, 6, 20, 0.54);
+    background: rgba(5, 20, 16, 0.58);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    border-left: 1px solid rgba(129, 140, 248, 0.10);
-    border-right: 1px solid rgba(255, 255, 255, 0.09);
-    border-bottom: 1px solid rgba(192, 132, 252, 0.20);
-    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.48);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.16));
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.22));
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+    transition: background 850ms ease-in-out, border-color 850ms ease-in-out;
   }
 
   /* Subtle Glass Pill */
@@ -116,16 +118,17 @@
   }
 
   .liquid-pill-dark {
-    background: rgba(12, 10, 28, 0.68);
+    background: var(--stage-card-bg, rgba(9, 45, 37, 0.65));
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(216, 180, 254, 0.24);
-    border-left: 1px solid rgba(129, 140, 248, 0.18);
-    border-right: 1px solid rgba(251, 146, 60, 0.12);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.28));
+    border-left: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.20));
+    border-right: 1px solid rgba(255, 255, 255, 0.10);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow:
-      0 10px 26px -6px rgba(2, 1, 8, 0.75),
+      0 10px 26px -6px rgba(0, 0, 0, 0.65),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+    transition: background 850ms ease-in-out, border-color 850ms ease-in-out;
   }
 }
 
@@ -257,3 +260,320 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   PROFESSIONAL MULTI-PAGE PRINT STYLESHEET (A4 PORTRAIT)
+   Provides crisp, ink-efficient document backgrounds (#F8FBF9),
+   forest-green headings (#092D25), emerald accents (#0F8B68),
+   and reliable CSS pagination across all report sections.
+   ============================================================ */
+@page {
+  size: A4 portrait;
+  margin: 10mm 12mm 12mm 12mm;
+}
+
+@media print {
+  /* 0. CSS Variable Overrides for Print */
+  :root {
+    --stage-bg-base: #F8FBF9 !important;
+    --stage-header-bg: #FFFFFF !important;
+    --stage-card-bg: #FFFFFF !important;
+    --stage-card-border: #CBD5E1 !important;
+  }
+
+  /* 1. Global Reset & Print Canvas Foundation */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box !important;
+  }
+
+  html,
+  body,
+  #root,
+  [data-stage-theme],
+  [data-testid="decision-report-view"],
+  .min-h-screen,
+  main,
+  section {
+    background-color: #F8FBF9 !important;
+    background: #F8FBF9 !important;
+    color: #14231E !important;
+    min-height: 0 !important;
+    height: auto !important;
+    box-shadow: none !important;
+  }
+
+  html,
+  body {
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* 2. Hide Screen-Only Effects, Spline, Navs & Atmospheric Canvases */
+  header,
+  nav,
+  .print\:hidden,
+  [data-testid="workspace-spline-fallback"],
+  [data-testid="workspace-spline-stage"],
+  canvas,
+  svg filter,
+  .spline-canvas-wrapper,
+  .locus-loop-wave-primary,
+  .locus-loop-wave-secondary,
+  .locus-loop-wave-amber,
+  .leaflet-control-zoom,
+  .leaflet-control-attribution,
+  a[href^="#"] {
+    display: none !important;
+  }
+
+  /* 3. Report Container Sizing & Normalization */
+  [data-testid="decision-report-view"] {
+    background: #F8FBF9 !important;
+    background-color: #F8FBF9 !important;
+    color: #14231E !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  .mx-auto.max-w-\[1680px\] {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 4. Document Header & Footer for Print */
+  .print-report-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-bottom: 2px solid #0F8B68 !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .print-report-footer {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-top: 1px solid #CBD5E1 !important;
+    padding-top: 4px !important;
+    margin-top: 12px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 7.5pt !important;
+    color: #64748B !important;
+  }
+
+  /* 5. Liquid Glass Card Normalization to Crisp Print Surfaces */
+  .liquid-glass-dark,
+  .liquid-glass-control,
+  .liquid-glass-subtle,
+  .liquid-pill-dark {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: #14231E !important;
+  }
+
+  /* Text & Heading Print Contrast */
+  h1, h2, h3, h4, .font-display {
+    color: #092D25 !important;
+  }
+
+  p, span, td, th {
+    color: #1E293B !important;
+  }
+
+  .text-white {
+    color: #092D25 !important;
+  }
+
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300 {
+    color: #334155 !important;
+  }
+
+  .text-slate-400,
+  .text-slate-500 {
+    color: #64748B !important;
+  }
+
+  /* Subtle background fills on print sub-boxes */
+  .bg-black\/30,
+  .bg-black\/40,
+  .bg-white\/\[0\.02\],
+  .bg-white\/\[0\.025\],
+  .bg-white\/\[0\.03\],
+  .bg-white\/\[0\.04\],
+  .bg-white\/\[0\.06\],
+  .bg-\[\#050312\]\/80,
+  .bg-\[\#050312\]\/85,
+  .bg-\[\#050312\]\/65,
+  .bg-\[\#080618\]\/80 {
+    background-color: #F8FAFC !important;
+    background: #F8FAFC !important;
+    border-color: #E2E8F0 !important;
+  }
+
+  /* Accent surface overrides */
+  .bg-emerald-500\/\[0\.04\],
+  .bg-emerald-500\/\[0\.06\],
+  .bg-emerald-500\/10,
+  .bg-emerald-500\/15,
+  .bg-emerald-500\/20 {
+    background-color: #E9F7F0 !important;
+    background: #E9F7F0 !important;
+    border-color: #A7F3D0 !important;
+    color: #092D25 !important;
+  }
+
+  .bg-amber-500\/\[0\.04\],
+  .bg-amber-500\/\[0\.08\],
+  .bg-amber-500\/10,
+  .bg-amber-500\/15,
+  .bg-amber-500\/20 {
+    background-color: #FEF3C7 !important;
+    background: #FEF3C7 !important;
+    border-color: #FCD34D !important;
+    color: #92400E !important;
+  }
+
+  .bg-indigo-500\/\[0\.05\],
+  .bg-indigo-500\/10,
+  .bg-indigo-500\/20 {
+    background-color: #EEF2FF !important;
+    background: #EEF2FF !important;
+    border-color: #C7D2FE !important;
+    color: #1E1B4B !important;
+  }
+
+  /* 6. Strict Multi-Page Pagination Rules */
+  /* Page 1: Executive Summary - cleanly formatted to fit Page 1 */
+  [data-testid="report-executive-summary"] {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    border: 1.5px solid #CBD5E1 !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    margin: 0 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  [data-testid="report-executive-summary"] .space-y-6 > * + * {
+    margin-top: 6px !important;
+  }
+
+  /* Force horizontal layout for Executive Summary Header */
+  [data-testid="report-executive-summary"] > div:first-child {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+    padding-bottom: 6px !important;
+    gap: 12px !important;
+  }
+
+  [data-testid="report-executive-summary"] h1 {
+    font-size: 14pt !important;
+    line-height: 1.2 !important;
+    margin: 2px 0 !important;
+  }
+
+  /* Force 3 horizontal columns for Why / What could go wrong / Next steps */
+  [data-testid="report-executive-summary"] .grid.lg\:grid-cols-3,
+  [data-testid="report-executive-summary"] > div.grid:nth-of-type(1) {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  /* Force 4 horizontal columns for Evidence Coverage Summary */
+  [data-testid="evidence-coverage-summary-grid"] .grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  /* Compact padding on sub-cards inside Executive Summary */
+  [data-testid="report-executive-summary"] .rounded-2xl {
+    padding: 6px 8px !important;
+    border-radius: 8px !important;
+  }
+
+  [data-testid="report-executive-summary"] .rounded-xl {
+    padding: 4px 6px !important;
+    border-radius: 6px !important;
+  }
+
+  [data-testid="report-executive-summary"] p {
+    font-size: 8pt !important;
+    line-height: 1.3 !important;
+  }
+
+  [data-testid="report-executive-summary"] span {
+    font-size: 7.5pt !important;
+  }
+
+  /* Page Break before Major Deep Sections */
+  .print-page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Prevent awkward card splits */
+  [data-testid^="report-factor-"],
+  [data-testid="report-shifted-factors"],
+  .rounded-2xl,
+  .rounded-xl {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Tables pagination */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th {
+    background-color: #F1F5F9 !important;
+    color: #092D25 !important;
+    border-bottom: 1.5px solid #CBD5E1 !important;
+  }
+
+  td {
+    border-bottom: 1px solid #E2E8F0 !important;
+    color: #1E293B !important;
+  }
+
+  /* Make sure columns in side-by-side grids flow predictably in print */
+  .grid {
+    display: grid !important;
+  }
+}
+

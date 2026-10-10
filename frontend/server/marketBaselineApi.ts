@@ -240,10 +240,63 @@ const BUSINESS_TYPE_MAP: Record<string, BusinessTypeMapping> = {
       { name: ' Guardian Pharmacy', subCategory: 'Health & Personal Care' },
     ],
   },
+  tea_stall: {
+    key: 'tea_stall',
+    displayLabel: 'Tea & Snacks Stall',
+    pluralLabel: 'tea stalls & street snack kiosks',
+    googleIncludedTypes: ['cafe', 'meal_takeaway', 'restaurant'],
+    googleLegacyType: 'meal_takeaway',
+    googleKeyword: 'tea stall chai snacks tapri',
+    demoBrandPool: [
+      { name: 'Chai Point Express', subCategory: 'Tea & Quick Beverage Kiosk' },
+      { name: 'Sharma Tea Stall & Samosa', subCategory: 'Traditional Street Chai Stall' },
+      { name: 'Campus Tapri Corner', subCategory: 'Student Chai & Bun Maska Stall' },
+      { name: 'Amrit Tulya Tea Counter', subCategory: 'Jaggery & Spiced Tea Stall' },
+      { name: 'Kolkata Kathi & Chai Hut', subCategory: 'Rolls & Evening Snacks Stall' },
+      { name: 'South Filter Coffee & Tea Point', subCategory: 'Quick Standing Tea Stall' },
+      { name: 'Om Sai Snacks & Vada Pav', subCategory: 'Hot Street Snacks Counter' },
+      { name: 'Corner Chai Bar', subCategory: 'Compact Neighborhood Tea Point' },
+    ],
+  },
+  stationery: {
+    key: 'stationery',
+    displayLabel: 'Stationery & Print Shop',
+    pluralLabel: 'stationery & print shops',
+    googleIncludedTypes: ['book_store', 'store'],
+    googleLegacyType: 'book_store',
+    googleKeyword: 'stationery books xerox print shop',
+    demoBrandPool: [
+      { name: 'Student Xerox & Document Center', subCategory: 'High-speed Copy & Print' },
+      { name: 'Vidyarthi Book & Stationery Mart', subCategory: 'Academic Books & Supplies' },
+      { name: 'Campus Corner Stationery', subCategory: 'Student Notebooks & Drafting' },
+      { name: 'National Paper & Print Depot', subCategory: 'Commercial Stationery & Print' },
+      { name: 'QuickPrint Xerox Point', subCategory: 'Spiral Binding & Lamination' },
+      { name: 'Saraswati Stationery & Art Supplies', subCategory: 'School & College Goods' },
+      { name: 'Modern Digital Xerox', subCategory: 'Color Print & Project Binding' },
+      { name: 'City Book & Stationery House', subCategory: 'Retail Stationery Mart' },
+    ],
+  },
 };
 
 export function resolveBusinessTypeMapping(rawType: string): BusinessTypeMapping {
   const norm = (rawType || '').trim().toLowerCase();
+  if (
+    norm.includes('tea') ||
+    norm.includes('chai') ||
+    norm.includes('snack') ||
+    norm.includes('stall') ||
+    norm.includes('tapri')
+  ) {
+    return BUSINESS_TYPE_MAP.tea_stall;
+  }
+  if (
+    norm.includes('stationer') ||
+    norm.includes('xerox') ||
+    norm.includes('print') ||
+    norm.includes('book')
+  ) {
+    return BUSINESS_TYPE_MAP.stationery;
+  }
   if (norm.includes('quick') || norm.includes('qsr') || norm.includes('restaurant')) {
     return BUSINESS_TYPE_MAP.qsr;
   }
