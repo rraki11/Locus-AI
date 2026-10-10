@@ -39,6 +39,7 @@ export interface LocationIntelligenceViewProps {
   preferFallback?: boolean;
   onBackToMarketDiscovery: () => void;
   onBackToGroundReality: () => void;
+  onBackToHome?: () => void;
   onContinueToDecision?: (payload: {
     scenarioAssumptions: ScenarioAssumptions;
     comparison: LocationIntelligenceComparisonResponse;
@@ -148,6 +149,7 @@ export const LocationIntelligenceView: React.FC<
   preferFallback = false,
   onBackToMarketDiscovery,
   onBackToGroundReality,
+  onBackToHome,
   onContinueToDecision,
   unlockedViews,
   onNavigateToView,
@@ -320,15 +322,28 @@ export const LocationIntelligenceView: React.FC<
       <header className="relative z-30 border-b border-white/[0.10] bg-[var(--stage-header-bg,rgba(9,20,39,0.82))] backdrop-blur-xl transition-colors duration-[850ms]">
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-6 py-2.5 sm:px-10">
           <div className="flex items-center gap-3.5">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (onBackToHome) {
+                  onBackToHome();
+                } else if (onBackToMarketDiscovery) {
+                  onBackToMarketDiscovery();
+                } else if (typeof window !== 'undefined') {
+                  window.location.href = '/';
+                }
+              }}
+              title="Return to LOCUS AI Home"
+              className="group -ml-1 flex items-center gap-2 rounded-lg px-1.5 py-1 transition-all hover:bg-white/[0.08]"
+            >
               <span
-                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#112B46] via-[#245A78] to-[#54D6E8] shadow-[0_0_10px_rgba(84,214,232,0.9)]"
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#112B46] via-[#245A78] to-[#54D6E8] shadow-[0_0_10px_rgba(84,214,232,0.9)] transition-transform group-hover:scale-125"
                 aria-hidden="true"
               />
-              <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
+              <span className="font-display text-sm font-bold tracking-[0.12em] text-white transition-colors group-hover:text-cyan-300">
                 LOCUS AI
               </span>
-            </div>
+            </button>
             <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
             <span className="bg-gradient-to-r from-[#54D6E8] via-[#BAE6FD] to-[#DDF6FA] bg-clip-text text-xs font-semibold text-transparent">
               03 / Location Intelligence &amp; Scenario Simulator

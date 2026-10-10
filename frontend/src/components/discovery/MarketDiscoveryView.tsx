@@ -53,6 +53,7 @@ export interface MarketDiscoveryViewProps {
   initialProfile?: BusinessProfileConfig;
   preferFallback?: boolean;
   onBackToPage2?: () => void;
+  onBackToHome?: () => void;
   onContinueToGroundReality?: (payload: {
     profile: BusinessProfileConfig;
     state: string;
@@ -87,6 +88,7 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
   initialProfile = DEFAULT_DISCOVERY_BUSINESS_PROFILE,
   preferFallback = false,
   onBackToPage2,
+  onBackToHome,
   onContinueToGroundReality,
   unlockedViews,
   onNavigateToView,
@@ -1030,15 +1032,28 @@ export const MarketDiscoveryView: React.FC<MarketDiscoveryViewProps> = ({
       >
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-6 py-2.5 sm:px-10">
           <div className="flex items-center gap-3.5">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (onBackToHome) {
+                  onBackToHome();
+                } else if (onBackToPage2) {
+                  onBackToPage2();
+                } else if (typeof window !== 'undefined') {
+                  window.location.href = '/';
+                }
+              }}
+              title="Return to LOCUS AI Home"
+              className="group -ml-1 flex items-center gap-2 rounded-lg px-1.5 py-1 transition-all hover:bg-white/[0.08]"
+            >
               <span
-                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#0F8B68] via-[#72D9B0] to-[#E9F7F0] shadow-[0_0_10px_rgba(114,217,176,0.85)]"
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#0F8B68] via-[#72D9B0] to-[#E9F7F0] shadow-[0_0_10px_rgba(114,217,176,0.85)] transition-transform group-hover:scale-125"
                 aria-hidden="true"
               />
-              <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
+              <span className="font-display text-sm font-bold tracking-[0.12em] text-white transition-colors group-hover:text-emerald-300">
                 LOCUS AI
               </span>
-            </div>
+            </button>
             <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
             <span className="bg-gradient-to-r from-[#72D9B0] via-[#0F8B68] to-[#E9F7F0] bg-clip-text text-xs font-semibold text-transparent">
               01 / Market Discovery

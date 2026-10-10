@@ -56,6 +56,7 @@ export interface StreetScanViewProps {
   handoff: GroundRealityHandoffPayload;
   preferFallback?: boolean;
   onBackToMarketDiscovery: () => void;
+  onBackToHome?: () => void;
   onContinueToIntelligence?: (
     fusionResult: StreetScanFusionResponse | null
   ) => void;
@@ -107,6 +108,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
   handoff,
   preferFallback = false,
   onBackToMarketDiscovery,
+  onBackToHome,
   onContinueToIntelligence,
   unlockedViews,
   onNavigateToView,
@@ -1010,15 +1012,28 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
       <header className="relative z-30 border-b border-white/[0.10] bg-[var(--stage-header-bg,rgba(7,29,27,0.80))] backdrop-blur-xl transition-colors duration-[850ms]">
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-6 py-2.5 sm:px-10">
           <div className="flex items-center gap-3.5">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (onBackToHome) {
+                  onBackToHome();
+                } else if (onBackToMarketDiscovery) {
+                  onBackToMarketDiscovery();
+                } else if (typeof window !== 'undefined') {
+                  window.location.href = '/';
+                }
+              }}
+              title="Return to LOCUS AI Home"
+              className="group -ml-1 flex items-center gap-2 rounded-lg px-1.5 py-1 transition-all hover:bg-white/[0.08]"
+            >
               <span
-                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#0A3935] via-[#16A085] to-[#78E6C0] shadow-[0_0_10px_rgba(22,160,133,0.85)]"
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#0A3935] via-[#16A085] to-[#78E6C0] shadow-[0_0_10px_rgba(22,160,133,0.85)] transition-transform group-hover:scale-125"
                 aria-hidden="true"
               />
-              <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
+              <span className="font-display text-sm font-bold tracking-[0.12em] text-white transition-colors group-hover:text-emerald-300">
                 LOCUS AI
               </span>
-            </div>
+            </button>
             <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
             <span className="bg-gradient-to-r from-[#78E6C0] via-[#16A085] to-[#A7F3D0] bg-clip-text text-xs font-semibold text-transparent">
               02 / Ground Reality — Street Scan &amp; Ground Truth Fusion

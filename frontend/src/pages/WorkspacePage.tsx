@@ -186,6 +186,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
           <MarketDiscoveryView
             preferFallback={externalReducedMotion}
             onBackToPage2={onBack}
+            onBackToHome={onBack}
             onContinueToGroundReality={(payload) => {
               setHandoff((prev) => {
                 if (
@@ -219,6 +220,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
               handoff={effectiveHandoff}
               preferFallback={externalReducedMotion}
               onBackToMarketDiscovery={() => handleSwitchView('view1')}
+              onBackToHome={onBack}
               onContinueToIntelligence={(fusion) => {
                 setFusionResult(fusion);
                 onFusionResultChange?.(fusion);
@@ -244,6 +246,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
               preferFallback={externalReducedMotion}
               onBackToMarketDiscovery={() => handleSwitchView('view1')}
               onBackToGroundReality={() => handleSwitchView('view2')}
+              onBackToHome={onBack}
               onContinueToDecision={(payload) => {
                 setScenarioAssumptions(payload.scenarioAssumptions);
                 onScenarioAssumptionsChange?.(payload.scenarioAssumptions);
@@ -276,6 +279,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
               onBackToMarketDiscovery={() => handleSwitchView('view1')}
               onBackToGroundReality={() => handleSwitchView('view2')}
               onBackToIntelligence={() => handleSwitchView('view3')}
+              onBackToHome={onBack}
               unlockedViews={unlockedViews}
               onNavigateToView={handleSwitchView}
             />

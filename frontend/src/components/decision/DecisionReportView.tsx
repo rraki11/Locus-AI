@@ -39,6 +39,7 @@ export interface DecisionReportViewProps {
   onBackToMarketDiscovery: () => void;
   onBackToGroundReality: () => void;
   onBackToIntelligence: () => void;
+  onBackToHome?: () => void;
   unlockedViews?: Set<WorkspaceViewKey>;
   onNavigateToView?: (targetView: WorkspaceViewKey) => void;
 }
@@ -149,6 +150,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
   onBackToMarketDiscovery,
   onBackToGroundReality,
   onBackToIntelligence,
+  onBackToHome,
   unlockedViews,
   onNavigateToView,
 }) => {
@@ -241,15 +243,28 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
       <header className="relative z-30 border-b border-white/[0.10] bg-[var(--stage-header-bg,rgba(6,25,20,0.85))] backdrop-blur-xl transition-colors duration-[850ms] print:hidden">
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-6 py-2.5 sm:px-10">
           <div className="flex items-center gap-3.5">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (onBackToHome) {
+                  onBackToHome();
+                } else if (onBackToMarketDiscovery) {
+                  onBackToMarketDiscovery();
+                } else if (typeof window !== 'undefined') {
+                  window.location.href = '/';
+                }
+              }}
+              title="Return to LOCUS AI Home"
+              className="group -ml-1 flex items-center gap-2 rounded-lg px-1.5 py-1 transition-all hover:bg-white/[0.08]"
+            >
               <span
-                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#092D25] via-[#0F8B68] to-[#72D9B0] shadow-[0_0_10px_rgba(114,217,176,0.9)]"
+                className="h-2 w-2 rounded-full bg-gradient-to-tr from-[#092D25] via-[#0F8B68] to-[#72D9B0] shadow-[0_0_10px_rgba(114,217,176,0.9)] transition-transform group-hover:scale-125"
                 aria-hidden="true"
               />
-              <span className="font-display text-sm font-bold tracking-[0.12em] text-white">
+              <span className="font-display text-sm font-bold tracking-[0.12em] text-white transition-colors group-hover:text-emerald-300">
                 LOCUS AI
               </span>
-            </div>
+            </button>
             <span className="h-3.5 w-px bg-white/15" aria-hidden="true" />
             <span className="bg-gradient-to-r from-[#72D9B0] via-[#0F8B68] to-[#E9F7F0] bg-clip-text text-xs font-semibold text-transparent">
               04 / Decision — Explainable Market Entry Report
