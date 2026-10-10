@@ -1108,7 +1108,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
           {/* LEFT PANEL: INPUT SELECTION (PHOTOS OR VIDEO) + PIPELINE STATUS */}
           <aside
             aria-label="Street Scan Upload and Pipeline Status"
-            className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5"
+            className="liquid-glass-dark flex flex-col justify-between rounded-3xl p-4 xl:p-5 max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar"
           >
             <div className="space-y-4">
               {/* Candidate Scope Context */}
