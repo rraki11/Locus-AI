@@ -49,30 +49,30 @@
     background:
       radial-gradient(
         120% 90% at 15% 0%,
-        var(--stage-ambient-accent, rgba(114, 217, 176, 0.14)) 0%,
-        var(--stage-ambient-primary, rgba(15, 139, 104, 0.10)) 42%,
-        rgba(4, 16, 13, 0) 78%
+        rgba(255, 255, 255, 0.04) 0%,
+        var(--stage-ambient-accent, rgba(94, 234, 212, 0.08)) 25%,
+        transparent 65%
       ),
       radial-gradient(
-        95% 80% at 88% 100%,
-        var(--stage-ambient-secondary, rgba(9, 45, 37, 0.18)) 0%,
-        var(--stage-ambient-primary, rgba(15, 139, 104, 0.08)) 45%,
-        rgba(4, 16, 13, 0) 80%
+        100% 85% at 88% 100%,
+        var(--stage-ambient-secondary, rgba(14, 165, 233, 0.08)) 0%,
+        transparent 65%
       ),
       linear-gradient(
-        155deg,
-        var(--stage-card-bg, rgba(9, 45, 37, 0.65)) 0%,
-        rgba(5, 20, 16, 0.58) 100%
+        165deg,
+        var(--stage-card-bg, rgba(9, 14, 20, 0.74)) 0%,
+        rgba(5, 9, 14, 0.82) 100%
       );
-    backdrop-filter: blur(28px) saturate(160%);
-    -webkit-backdrop-filter: blur(28px) saturate(160%);
-    border-top: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.30));
-    border-left: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.22));
-    border-right: 1px solid rgba(255, 255, 255, 0.10);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    border-bottom: 1px solid var(--stage-card-border, rgba(45, 212, 191, 0.18));
     box-shadow:
-      0 28px 64px -18px rgba(0, 0, 0, 0.75),
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
+      0 28px 64px -18px rgba(0, 0, 0, 0.85),
+      0 4px 18px -2px rgba(0, 0, 0, 0.50),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.20),
+      inset 0 0 28px 0 var(--stage-ambient-primary, rgba(20, 184, 166, 0.04));
     transition: background 850ms ease-in-out, border-color 850ms ease-in-out, box-shadow 850ms ease-in-out;
   }
 
@@ -80,32 +80,65 @@
   .liquid-glass-control {
     background: linear-gradient(
       145deg,
-      var(--stage-header-bg, rgba(6, 25, 20, 0.85)) 0%,
-      rgba(4, 16, 13, 0.78) 100%
+      var(--stage-header-bg, rgba(5, 20, 24, 0.82)) 0%,
+      rgba(3, 8, 12, 0.82) 100%
     );
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
-    border-top: 1px solid var(--stage-header-border, rgba(114, 217, 176, 0.28));
-    border-left: 1px solid var(--stage-header-border, rgba(114, 217, 176, 0.20));
-    border-right: 1px solid rgba(255, 255, 255, 0.10);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    border-left: 1px solid var(--stage-header-border, rgba(45, 212, 191, 0.24));
     box-shadow:
-      0 14px 32px -10px rgba(0, 0, 0, 0.68),
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
-    transition: background 850ms ease-in-out, border-color 850ms ease-in-out;
+      0 14px 32px -10px rgba(0, 0, 0, 0.70),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
+    transition: background 850ms ease-in-out, border-color 850ms ease-in-out, box-shadow 400ms ease;
   }
 
   /* Tertiary Subtle Recessed Input / Metadata Surface */
   .liquid-glass-subtle {
-    background: rgba(5, 20, 16, 0.58);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-left: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.16));
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    border-bottom: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.22));
-    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
-    transition: background 850ms ease-in-out, border-color 850ms ease-in-out;
+    background: linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.055) 0%,
+      rgba(255, 255, 255, 0.015) 100%
+    ), rgba(4, 10, 14, 0.65);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow:
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.10),
+      0 6px 16px -4px rgba(0, 0, 0, 0.45);
+    transition: background 400ms ease-in-out, border-color 400ms ease-in-out, box-shadow 400ms ease;
+  }
+
+  /* Frosted Glass Tray / Sub-Card */
+  .glass-sub-card {
+    background: linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.055) 0%,
+      rgba(255, 255, 255, 0.015) 100%
+    ), rgba(4, 11, 16, 0.58);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow:
+      0 8px 24px -6px rgba(0, 0, 0, 0.52),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .glass-sub-card:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+    border-top-color: rgba(255, 255, 255, 0.30);
+    background: linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.025) 100%
+    ), rgba(4, 11, 16, 0.68);
+    box-shadow:
+      0 12px 28px -6px rgba(0, 0, 0, 0.62),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.20);
   }
 
   /* Subtle Glass Pill */
@@ -118,13 +151,13 @@
   }
 
   .liquid-pill-dark {
-    background: var(--stage-card-bg, rgba(9, 45, 37, 0.65));
+    background: var(--stage-card-bg, rgba(6, 22, 26, 0.68));
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border-top: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.28));
-    border-left: 1px solid var(--stage-card-border, rgba(114, 217, 176, 0.20));
-    border-right: 1px solid rgba(255, 255, 255, 0.10);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    border-left: 1px solid var(--stage-card-border, rgba(45, 212, 191, 0.30));
+    border-right: 1px solid rgba(255, 255, 255, 0.09);
+    border-bottom: 1px solid var(--stage-card-border, rgba(45, 212, 191, 0.20));
     box-shadow:
       0 10px 26px -6px rgba(0, 0, 0, 0.65),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.16);

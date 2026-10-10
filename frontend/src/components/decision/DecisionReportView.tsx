@@ -393,7 +393,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
             </div>
 
             {/* Quick Analytical Context Sub-box */}
-            <div className="flex flex-col items-start rounded-2xl border border-white/15 bg-[#050312]/85 p-3.5 lg:items-end shrink-0 shadow-lg">
+            <div className="glass-sub-card flex flex-col items-start rounded-2xl p-3.5 lg:items-end shrink-0 shadow-lg">
               <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-slate-400">
                 ANALYTICAL POSTURE
               </span>
@@ -422,7 +422,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                   {report.executiveSummary.why_it_may_work.map((item, idx) => (
                     <div
                       key={idx}
-                      className="rounded-xl border border-emerald-400/20 bg-black/30 p-2.5 space-y-1"
+                      className="rounded-xl border border-emerald-400/25 bg-white/[0.04] p-2.5 space-y-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]"
                     >
                       <div className="flex items-start gap-2">
                         <span className="font-mono text-xs font-bold text-emerald-400 shrink-0">
@@ -455,7 +455,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                   {report.executiveSummary.what_could_go_wrong.map((item, idx) => (
                     <div
                       key={idx}
-                      className="rounded-xl border border-amber-400/20 bg-black/30 p-2.5 space-y-1"
+                      className="rounded-xl border border-amber-400/25 bg-white/[0.04] p-2.5 space-y-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]"
                     >
                       <div className="flex items-start gap-2">
                         <span className="font-mono text-xs font-bold text-amber-400 shrink-0">
@@ -484,7 +484,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                   <span>What To Do Before Spending Money</span>
                 </div>
 
-                <div className="rounded-xl border border-[#FB923C]/30 bg-black/40 p-3 space-y-2">
+                <div className="glass-sub-card rounded-xl border border-[#FB923C]/30 p-3 space-y-2">
                   <span className="inline-block rounded border border-[#FB923C]/40 bg-[#FB923C]/15 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-[#FED7AA]">
                     Priority Next Action
                   </span>
@@ -503,7 +503,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
           {/* Neutral Evidence Coverage Summary (Explicitly separates data coverage from recommendation quality) */}
           <div
             data-testid="evidence-coverage-summary-grid"
-            className="rounded-2xl border border-white/[0.10] bg-white/[0.025] p-4 space-y-2.5"
+            className="glass-sub-card rounded-2xl p-4 space-y-2.5"
           >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-2">
               <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
@@ -515,7 +515,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
             </div>
 
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4 font-mono text-xs print:grid-cols-4 print:gap-1.5">
-              <div className="rounded-xl border border-white/[0.07] bg-black/30 p-2.5 space-y-1">
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-2.5 space-y-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
                 <span className="block text-[9.5px] uppercase tracking-wider text-slate-400">
                   Business listings
                 </span>
@@ -524,7 +524,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 </span>
               </div>
 
-              <div className="rounded-xl border border-white/[0.07] bg-black/30 p-2.5 space-y-1">
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-2.5 space-y-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
                 <span className="block text-[9.5px] uppercase tracking-wider text-slate-400">
                   Geographic context
                 </span>
@@ -533,7 +533,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 </span>
               </div>
 
-              <div className="rounded-xl border border-white/[0.07] bg-black/30 p-2.5 space-y-1">
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-2.5 space-y-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
                 <span className="block text-[9.5px] uppercase tracking-wider text-slate-400">
                   Street-level visual evidence
                 </span>
@@ -542,7 +542,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 </span>
               </div>
 
-              <div className="rounded-xl border border-white/[0.07] bg-black/30 p-2.5 space-y-1">
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-2.5 space-y-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
                 <span className="block text-[9.5px] uppercase tracking-wider text-slate-400">
                   Rent &amp; operating costs
                 </span>
@@ -610,7 +610,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
             </div>
 
             {/* Concise Decision Posture Badge (Explicitly NOT an AI Score) */}
-            <div className="flex flex-col items-start rounded-2xl border border-white/15 bg-[#050312]/80 px-4 py-3 lg:items-end">
+            <div className="glass-sub-card flex flex-col items-start rounded-2xl px-4 py-3 lg:items-end shadow-md">
               <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-slate-400">
                 DECISION POSTURE (ENGINE-DERIVED)
               </span>
@@ -1195,7 +1195,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
               </div>
 
               {/* Baseline vs Scenario Posture & Shifted Factors */}
-              <div className="rounded-2xl border border-white/[0.08] bg-[#080618]/80 p-3.5 space-y-2.5">
+              <div className="glass-sub-card rounded-2xl p-4 space-y-2.5">
                 <div className="flex items-center justify-between font-mono text-xs">
                   <span className="text-slate-400">Decision Posture Shift</span>
                   <span className="font-bold text-white">
@@ -1515,7 +1515,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
             </div>
 
             {/* Non-prescriptive Decision Guidance Statement */}
-            <div className="rounded-2xl border border-white/15 bg-[#050312]/85 p-4 space-y-1.5">
+            <div className="glass-sub-card rounded-2xl p-4 space-y-1.5 shadow-md">
               <p className="text-xs font-medium leading-relaxed text-white sm:text-sm">
                 {report.finalDecisionPosture.decision_guidance_statement}
               </p>

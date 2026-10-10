@@ -119,38 +119,38 @@ const STAGE_PALETTES: Record<WorkspaceStageThemeKey, StageWavePalette> = {
       'radial-gradient(ellipse 54% 48% at 58% 58%, rgba(15, 139, 104, 0.45) 0%, rgba(9, 45, 37, 0.35) 40%, rgba(4, 18, 14, 0.20) 68%, rgba(5, 20, 16, 0) 88%)',
   },
   teal: {
-    // Stage 2: Ground Reality (Near-black teal #071D1B, deep teal #0A3935, jade #16A085, mint #78E6C0)
-    base: '#041312',
+    // Stage 2: Ground Reality — Luminous Cyber Aurora (Electric Cyan, Aurora Teal, Deep Indigo)
+    base: '#03080E',
     wave1: [
-      'rgba(22, 160, 133, 0.72)',
-      'rgba(10, 57, 53, 0.65)',
-      'rgba(7, 29, 27, 0.38)',
-      'rgba(4, 19, 18, 0.12)',
+      'rgba(20, 184, 166, 0.48)',
+      'rgba(14, 165, 233, 0.38)',
+      'rgba(30, 27, 75, 0.28)',
+      'rgba(3, 8, 14, 0.08)',
     ],
     wave2: [
-      'rgba(120, 230, 192, 0.55)',
-      'rgba(22, 160, 133, 0.40)',
-      'rgba(10, 57, 53, 0.18)',
+      'rgba(94, 234, 212, 0.42)',
+      'rgba(56, 189, 248, 0.32)',
+      'rgba(15, 23, 42, 0.12)',
     ],
     wave3: [
-      'rgba(10, 57, 53, 0.60)',
-      'rgba(4, 19, 18, 0.28)',
+      'rgba(99, 102, 241, 0.22)',
+      'rgba(3, 8, 14, 0.15)',
     ],
     wave4: [
-      'rgba(22, 160, 133, 0.68)',
-      'rgba(10, 57, 53, 0.54)',
-      'rgba(7, 29, 27, 0.25)',
+      'rgba(14, 165, 233, 0.44)',
+      'rgba(20, 184, 166, 0.32)',
+      'rgba(6, 12, 20, 0.16)',
     ],
     wave5: [
-      'rgba(120, 230, 192, 0.62)',
-      'rgba(22, 160, 133, 0.48)',
-      'rgba(10, 57, 53, 0.28)',
-      'rgba(4, 19, 18, 0.12)',
+      'rgba(94, 234, 212, 0.42)',
+      'rgba(139, 92, 246, 0.22)',
+      'rgba(14, 165, 233, 0.18)',
+      'rgba(3, 8, 14, 0.08)',
     ],
     overlay1:
-      'radial-gradient(ellipse 62% 56% at 48% 46%, rgba(120, 230, 192, 0.25) 0%, rgba(22, 160, 133, 0.40) 36%, rgba(10, 57, 53, 0.26) 64%, rgba(4, 19, 18, 0) 90%)',
+      'radial-gradient(ellipse 62% 56% at 48% 46%, rgba(94, 234, 212, 0.16) 0%, rgba(14, 165, 233, 0.22) 36%, rgba(99, 102, 241, 0.14) 64%, rgba(3, 8, 14, 0) 90%)',
     overlay2:
-      'radial-gradient(ellipse 54% 48% at 58% 58%, rgba(22, 160, 133, 0.42) 0%, rgba(10, 57, 53, 0.32) 40%, rgba(7, 29, 27, 0.18) 68%, rgba(4, 19, 18, 0) 88%)',
+      'radial-gradient(ellipse 54% 48% at 58% 58%, rgba(20, 184, 166, 0.22) 0%, rgba(79, 70, 229, 0.18) 40%, rgba(15, 23, 42, 0.12) 68%, rgba(3, 8, 14, 0) 88%)',
   },
   midnight: {
     // Stage 3: Location Intelligence (Midnight navy #091427, deep blue #112B46, muted blue #245A78, electric cyan #54D6E8)

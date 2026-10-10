@@ -487,20 +487,20 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
               </div>
 
               {/* Optional Enhancement Communication & Actions */}
-              <div className="rounded-2xl border border-sky-400/30 bg-sky-500/[0.07] p-3.5 space-y-2.5">
-                <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-sky-300">
-                  <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+              <div className="rounded-2xl border border-teal-400/30 border-t-white/25 bg-gradient-to-br from-teal-500/[0.12] via-sky-500/[0.07] to-transparent p-4 space-y-3 shadow-[0_12px_28px_-8px_rgba(20,184,166,0.22),inset_0_1px_0_0_rgba(255,255,255,0.22)] backdrop-blur-md">
+                <div className="flex items-center gap-1.5 font-mono text-[10.5px] font-bold uppercase tracking-wider text-teal-300">
+                  <Sparkles className="h-3.5 w-3.5 text-teal-400" />
                   <span>Optional Ground Enhancement</span>
                 </div>
-                <p className="text-xs leading-relaxed text-slate-200">
-                  Want to add more detail? Upload a short street video to supplement the map-based assessment.
+                <p className="text-xs leading-relaxed text-slate-200/90">
+                  Want to add more detail? Upload a short street video to supplement the map-based assessment with live visual storefronts and activity signals.
                 </p>
-                <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+                <div className="flex flex-col gap-2 pt-0.5 sm:flex-row">
                   <button
                     type="button"
                     data-testid="skip-to-map-analysis-button"
                     onClick={() => onContinueToIntelligence?.(fusionResult)}
-                    className="flex-1 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-center text-xs font-semibold text-white transition-colors hover:bg-white/20 hover:border-white/40"
+                    className="flex-1 rounded-xl border border-white/15 border-t-white/25 bg-white/[0.06] hover:bg-white/[0.12] hover:border-white/30 px-3 py-2 text-center text-xs font-semibold text-white transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]"
                   >
                     Continue with Map-Based Analysis
                   </button>
@@ -508,7 +508,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                     type="button"
                     disabled={isRunning}
                     onClick={() => !isRunning && fileInputRef.current?.click()}
-                    className="flex-1 rounded-xl border border-[#E879F9]/50 bg-gradient-to-r from-[#7C3AED]/40 to-[#DB2777]/40 px-3 py-2 text-center text-xs font-semibold text-white transition-all hover:brightness-110 disabled:opacity-50"
+                    className="flex-1 rounded-xl border border-teal-300/50 bg-gradient-to-r from-teal-500/50 via-cyan-500/40 to-sky-500/50 hover:brightness-115 px-3 py-2 text-center text-xs font-semibold text-white transition-all shadow-[0_4px_16px_-2px_rgba(20,184,166,0.4),inset_0_1px_0_0_rgba(255,255,255,0.28)] disabled:opacity-50"
                   >
                     Enhance with Street Scan
                   </button>
@@ -556,12 +556,12 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                   data-testid="street-scan-upload-dropzone"
                   className={`group cursor-pointer rounded-2xl border border-dashed p-4 text-center transition-all ${
                     isRunning
-                      ? 'cursor-wait border-[#818CF8]/40 bg-[#4F46E5]/10'
-                      : 'border-white/20 bg-white/[0.025] hover:border-[#E879F9]/60 hover:bg-white/[0.05]'
+                      ? 'cursor-wait border-teal-400/50 bg-teal-500/15'
+                      : 'border-white/20 border-t-white/30 bg-gradient-to-b from-white/[0.04] to-transparent hover:border-teal-400/60 hover:bg-teal-500/[0.05] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)]'
                   }`}
                 >
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-[#E879F9]/35 bg-gradient-to-br from-[#4F46E5]/30 via-[#9333EA]/25 to-[#F97316]/25">
-                    <Upload className="h-4 w-4 text-[#FDBA74]" />
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-teal-400/35 bg-gradient-to-br from-teal-500/25 via-cyan-500/20 to-sky-500/20 shadow-[0_4px_12px_rgba(20,184,166,0.25)]">
+                    <Upload className="h-4 w-4 text-teal-200" />
                   </div>
                   <p className="mt-2 text-xs font-semibold text-white">
                     {uploadedFilename
@@ -579,9 +579,9 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                   disabled={isRunning}
                   onClick={() => void handleRunCalibratedDemo()}
                   data-testid="run-calibrated-demo-button"
-                  className="liquid-glass-control flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:border-[#FB923C]/55 hover:text-white disabled:opacity-50"
+                  className="liquid-glass-control flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:border-teal-400/55 hover:text-white disabled:opacity-50"
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-[#FB923C]" />
+                  <Sparkles className="h-3.5 w-3.5 text-teal-300" />
                   <span>
                     Run Calibrated Demo Scan (Labeled Sample Telemetry)
                   </span>
@@ -609,7 +609,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                   )}
                 </div>
 
-                <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-[#05030F]">
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-[#03090B] to-[#010406] shadow-[inset_0_0_28px_rgba(0,0,0,0.85),0_12px_28px_rgba(0,0,0,0.65)]">
                   {uploadedVideoUrl ? (
                     <video
                       src={uploadedVideoUrl}
@@ -696,19 +696,19 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                     return (
                       <div
                         key={step.stage}
-                        className={`flex items-center justify-between rounded-xl border px-2.5 py-1.5 text-xs transition-colors ${
+                        className={`flex items-center justify-between rounded-xl border px-2.5 py-1.5 text-xs transition-all ${
                           isCurrent
-                            ? 'border-[#E879F9]/50 bg-[#9333EA]/15 text-white'
+                            ? 'border-teal-400/60 border-t-white/30 bg-teal-500/20 text-white shadow-[0_0_16px_rgba(45,212,191,0.22),inset_0_1px_0_0_rgba(255,255,255,0.20)]'
                             : isDone
-                            ? 'border-emerald-400/25 bg-emerald-500/[0.07] text-slate-200'
-                            : 'border-white/[0.05] bg-white/[0.02] text-slate-500'
+                            ? 'border-emerald-400/30 border-t-emerald-300/40 bg-emerald-500/[0.08] text-slate-200'
+                            : 'border-white/[0.06] bg-white/[0.02] text-slate-400'
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           <span
                             className={`h-2 w-2 rounded-full ${
                               isCurrent
-                                ? 'animate-pulse bg-[#FB923C]'
+                                ? 'animate-pulse bg-teal-300 shadow-[0_0_8px_rgba(45,212,191,0.8)]'
                                 : isDone
                                 ? 'bg-emerald-400'
                                 : 'bg-slate-600'
@@ -731,7 +731,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                 {errorMessage && (
                   <div
                     role="alert"
-                    className="mt-2 flex items-start gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 p-2.5 text-xs text-amber-200"
+                    className="mt-2 flex items-start gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 p-2.5 text-xs text-amber-200 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]"
                   >
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
                     <span>{errorMessage}</span>
@@ -768,7 +768,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
               </div>
 
               {/* Explicit Spatial Honesty Notice */}
-              <div className="rounded-2xl border border-white/[0.09] bg-white/[0.03] px-3.5 py-2.5 text-xs leading-relaxed text-slate-300">
+              <div className="glass-sub-card rounded-2xl p-3.5 text-xs leading-relaxed text-slate-300">
                 <span className="font-semibold text-white">
                   Spatial Scope (0–300m Ground Reality):{' '}
                 </span>
@@ -782,51 +782,51 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                 data-testid="ground-reality-counters"
                 className="grid grid-cols-3 gap-2.5"
               >
-                <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/[0.08] p-3">
-                  <span className="block font-mono text-[10px] uppercase tracking-wider text-emerald-300">
+                <div className="rounded-2xl border border-emerald-400/35 border-t-white/30 bg-gradient-to-br from-emerald-500/[0.14] via-emerald-950/[0.25] to-transparent p-3.5 shadow-[0_10px_24px_-6px_rgba(16,185,129,0.25),inset_0_1px_0_0_rgba(255,255,255,0.22)] backdrop-blur-md">
+                  <span className="block font-mono text-[10px] uppercase tracking-wider text-emerald-300 font-semibold">
                     Observed entities
                   </span>
                   <span
                     data-testid="count-observed-entities"
-                    className="mt-1 block font-display text-2xl font-bold text-white"
+                    className="mt-1 block font-display text-2xl font-bold text-white tracking-tight"
                   >
                     {fusionResult ? fusionResult.counts.observed_entities : '—'}
                   </span>
-                  <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
+                  <span className="mt-0.5 block font-mono text-[10px] text-emerald-200/60">
                     Temporally deduplicated
                   </span>
                 </div>
 
-                <div className="rounded-2xl border border-[#818CF8]/30 bg-[#4F46E5]/[0.10] p-3">
-                  <span className="block font-mono text-[10px] uppercase tracking-wider text-[#A5B4FC]">
+                <div className="rounded-2xl border border-sky-400/35 border-t-white/30 bg-gradient-to-br from-sky-500/[0.14] via-indigo-950/[0.25] to-transparent p-3.5 shadow-[0_10px_24px_-6px_rgba(56,189,248,0.25),inset_0_1px_0_0_rgba(255,255,255,0.22)] backdrop-blur-md">
+                  <span className="block font-mono text-[10px] uppercase tracking-wider text-sky-300 font-semibold">
                     Commercial signals
                   </span>
                   <span
                     data-testid="count-commercial-signals"
-                    className="mt-1 block font-display text-2xl font-bold text-white"
+                    className="mt-1 block font-display text-2xl font-bold text-white tracking-tight"
                   >
                     {fusionResult
                       ? fusionResult.counts.observed_commercial_signals
                       : '—'}
                   </span>
-                  <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
+                  <span className="mt-0.5 block font-mono text-[10px] text-sky-200/60">
                     Signboards + COCO context
                   </span>
                 </div>
 
-                <div className="rounded-2xl border border-[#FB923C]/35 bg-[#F97316]/[0.10] p-3">
-                  <span className="block font-mono text-[10px] uppercase tracking-wider text-[#FDBA74]">
+                <div className="rounded-2xl border border-amber-400/35 border-t-white/30 bg-gradient-to-br from-amber-500/[0.14] via-orange-950/[0.25] to-transparent p-3.5 shadow-[0_10px_24px_-6px_rgba(245,158,11,0.25),inset_0_1px_0_0_rgba(255,255,255,0.22)] backdrop-blur-md">
+                  <span className="block font-mono text-[10px] uppercase tracking-wider text-amber-300 font-semibold">
                     OCR-confirmed names
                   </span>
                   <span
                     data-testid="count-ocr-confirmed"
-                    className="mt-1 block font-display text-2xl font-bold text-white"
+                    className="mt-1 block font-display text-2xl font-bold text-white tracking-tight"
                   >
                     {fusionResult
                       ? fusionResult.counts.ocr_confirmed_names
                       : '—'}
                   </span>
-                  <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
+                  <span className="mt-0.5 block font-mono text-[10px] text-amber-200/60">
                     Normalized signboard text
                   </span>
                 </div>
@@ -856,7 +856,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                     {fusionResult.deduplicated_entities.map((entity) => (
                       <div
                         key={entity.entity_id}
-                        className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 transition-colors hover:border-emerald-400/35"
+                        className="glass-sub-card rounded-2xl p-3 hover:border-teal-400/40"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -876,7 +876,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                             </p>
                           </div>
 
-                          <span className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] text-emerald-300">
+                          <span className="shrink-0 rounded-lg border border-teal-400/30 bg-teal-500/10 px-2 py-0.5 font-mono text-[10px] text-teal-300">
                             Frames #{entity.frame_indices.join(', #')} (
                             {entity.first_seen_sec}s–{entity.last_seen_sec}s)
                           </span>
@@ -895,13 +895,13 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                     ))}
                   </div>
                 ) : fusionResult ? (
-                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 text-xs text-slate-400">
+                  <div className="glass-sub-card rounded-2xl p-4 text-xs text-slate-400">
                     No high-confidence commercial signboard text was confirmed
                     in the sampled keyframes. Try a clearer street-front video
                     clip or inspect the COCO activity breakdown below.
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 text-xs text-slate-400">
+                  <div className="glass-sub-card rounded-2xl p-4 text-xs text-slate-400">
                     Upload a street video or click{' '}
                     <span className="font-medium text-white">
                       Run Calibrated Demo Scan
@@ -932,13 +932,13 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                       (cls) => (
                         <div
                           key={cls.class_name}
-                          className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2"
+                          className="glass-sub-card rounded-xl px-3 py-2"
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-mono text-xs font-semibold capitalize text-white">
                               {cls.class_name}
                             </span>
-                            <span className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[9.5px] text-[#FDBA74]">
+                            <span className="rounded bg-white/[0.08] px-1.5 py-0.5 font-mono text-[9.5px] text-[#FDBA74]">
                               {cls.total_detections} det
                             </span>
                           </div>
@@ -995,7 +995,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
               {/* MAP BASELINE vs GROUND REALITY Summary Table */}
               <div
                 data-testid="fusion-comparison-summary"
-                className="rounded-2xl border border-white/[0.09] bg-white/[0.03] p-3.5 space-y-2"
+                className="glass-sub-card rounded-2xl p-4 space-y-2.5"
               >
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
@@ -1103,7 +1103,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                     onClick={() => setLedgerFilter(tab.id)}
                     className={`rounded-xl border px-2.5 py-1 font-mono text-[10px] transition-all ${
                       ledgerFilter === tab.id
-                        ? 'border-[#E879F9]/60 bg-[#9333EA]/25 font-semibold text-white'
+                        ? 'border-teal-400/70 bg-teal-500/25 font-semibold text-white shadow-[0_0_12px_rgba(45,212,191,0.3)]'
                         : 'border-white/10 bg-white/[0.03] text-slate-400 hover:text-slate-200'
                     }`}
                   >
@@ -1127,7 +1127,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                       return (
                         <div
                           key={item.fusion_id}
-                          className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3"
+                          className="glass-sub-card rounded-2xl p-3"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
@@ -1165,7 +1165,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                       );
                     })
                   ) : (
-                    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 text-xs text-slate-400">
+                    <div className="glass-sub-card rounded-2xl p-4 text-xs text-slate-400">
                       No items match the selected filter ({ledgerFilter}).
                     </div>
                   )
@@ -1181,7 +1181,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                     {baseline300m.slice(0, 5).map((place, pIdx) => (
                       <div
                         key={place.place_id || `${place.business_name || 'p'}-${pIdx}`}
-                        className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs"
+                        className="glass-sub-card flex items-center justify-between rounded-xl px-3 py-2 text-xs"
                       >
                         <div className="truncate pr-2">
                           <span className="font-medium text-slate-200">

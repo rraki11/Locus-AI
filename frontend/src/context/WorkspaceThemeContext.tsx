@@ -30,80 +30,80 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     key: 'emerald',
     stageCode: '01',
     title: 'Market Discovery',
-    bgBase: '#051410', // Deep forest-black
+    bgBase: '#040A08', // Deep obsidian canvas
     textPrimary: '#F8FAFC',
     textSecondary: '#A7F3D0',
     textMuted: '#6EE7B7',
-    cardBg: 'rgba(9, 45, 37, 0.65)', // Forest green glass
-    cardBorder: 'rgba(114, 217, 176, 0.22)', // Mint border
-    accentPrimary: '#0F8B68', // Emerald
-    accentSecondary: '#092D25', // Forest green
-    accentHighlight: '#72D9B0', // Mint
-    headerBg: 'rgba(5, 20, 16, 0.78)',
-    headerBorder: 'rgba(114, 217, 176, 0.18)',
-    ambientPrimary: 'rgba(15, 139, 104, 0.45)', // Emerald aura
-    ambientSecondary: 'rgba(9, 45, 37, 0.65)', // Deep forest
-    ambientAccent: 'rgba(114, 217, 176, 0.28)', // Mint glow
+    cardBg: 'rgba(8, 14, 12, 0.74)', // Pure obsidian crystal glass
+    cardBorder: 'rgba(52, 211, 153, 0.20)', // Subtle emerald aura
+    accentPrimary: '#10B981', // Emerald
+    accentSecondary: '#065F46', // Deep emerald
+    accentHighlight: '#6EE7B7', // Mint
+    headerBg: 'rgba(5, 12, 10, 0.85)',
+    headerBorder: 'rgba(52, 211, 153, 0.16)',
+    ambientPrimary: 'rgba(16, 185, 129, 0.28)', // Emerald aura
+    ambientSecondary: 'rgba(6, 95, 70, 0.30)', // Deep emerald glow
+    ambientAccent: 'rgba(110, 231, 183, 0.22)', // Mint sheen
     isLightMode: false,
   },
   view2: {
     key: 'teal',
     stageCode: '02',
     title: 'Ground Reality',
-    bgBase: '#041312', // Near-black teal #071D1B
+    bgBase: '#03080E', // Deep cyber-obsidian canvas
     textPrimary: '#F8FAFC',
     textSecondary: '#A7F3D0',
     textMuted: '#5EEAD4',
-    cardBg: 'rgba(10, 57, 53, 0.60)', // Deep teal #0A3935
-    cardBorder: 'rgba(22, 160, 133, 0.28)', // Jade #16A085
-    accentPrimary: '#16A085', // Jade
-    accentSecondary: '#0A3935', // Deep teal
-    accentHighlight: '#78E6C0', // Mint highlight
-    headerBg: 'rgba(7, 29, 27, 0.80)',
-    headerBorder: 'rgba(22, 160, 133, 0.22)',
-    ambientPrimary: 'rgba(22, 160, 133, 0.40)', // Jade
-    ambientSecondary: 'rgba(10, 57, 53, 0.60)', // Deep teal
-    ambientAccent: 'rgba(120, 230, 192, 0.24)', // Mint highlight
+    cardBg: 'rgba(9, 14, 20, 0.74)', // Obsidian crystal glass (no green sludge!)
+    cardBorder: 'rgba(45, 212, 191, 0.22)', // Subtle elegant aurora rim
+    accentPrimary: '#14B8A6', // Teal
+    accentSecondary: '#0D9488', // Cyan-teal
+    accentHighlight: '#5EEAD4', // Bright cyan-mint highlight
+    headerBg: 'rgba(6, 12, 18, 0.85)',
+    headerBorder: 'rgba(45, 212, 191, 0.16)',
+    ambientPrimary: 'rgba(20, 184, 166, 0.28)', // Cyber teal
+    ambientSecondary: 'rgba(14, 165, 233, 0.24)', // Electric sky
+    ambientAccent: 'rgba(94, 234, 212, 0.20)', // Mint sheen
     isLightMode: false,
   },
   view3: {
     key: 'midnight',
     stageCode: '03',
     title: 'Location Intelligence',
-    bgBase: '#060E1C', // Midnight navy #091427
+    bgBase: '#040814', // Cosmic midnight navy canvas
     textPrimary: '#F8FAFC',
     textSecondary: '#BAE6FD',
     textMuted: '#7DD3FC',
-    cardBg: 'rgba(17, 43, 70, 0.65)', // Deep blue #112B46
-    cardBorder: 'rgba(84, 214, 232, 0.25)', // Electric cyan #54D6E8
-    accentPrimary: '#54D6E8', // Electric cyan
-    accentSecondary: '#245A78', // Muted blue
-    accentHighlight: '#DDF6FA', // Cool pale blue
-    headerBg: 'rgba(9, 20, 39, 0.82)',
-    headerBorder: 'rgba(84, 214, 232, 0.20)',
-    ambientPrimary: 'rgba(84, 214, 232, 0.32)', // Electric cyan
-    ambientSecondary: 'rgba(17, 43, 70, 0.65)', // Deep blue
-    ambientAccent: 'rgba(36, 90, 120, 0.38)', // Muted blue
+    cardBg: 'rgba(9, 15, 26, 0.74)', // Midnight sapphire obsidian glass
+    cardBorder: 'rgba(56, 189, 248, 0.22)', // Electric sky-cyan rim
+    accentPrimary: '#38BDF8', // Electric cyan
+    accentSecondary: '#1E40AF', // Deep sapphire
+    accentHighlight: '#BAE6FD', // Pale ice blue
+    headerBg: 'rgba(6, 12, 22, 0.85)',
+    headerBorder: 'rgba(56, 189, 248, 0.16)',
+    ambientPrimary: 'rgba(56, 189, 248, 0.28)', // Electric cyan
+    ambientSecondary: 'rgba(30, 64, 175, 0.28)', // Deep sapphire glow
+    ambientAccent: 'rgba(125, 211, 252, 0.22)', // Pale blue sheen
     isLightMode: false,
   },
   view4: {
     key: 'report',
     stageCode: '04',
     title: 'Decision Report',
-    bgBase: '#081713', // Deep forest/emerald canvas with refined high-contrast clean cards
+    bgBase: '#040A08', // Refined executive obsidian canvas
     textPrimary: '#F8FAFC',
     textSecondary: '#E9F7F0',
     textMuted: '#A7F3D0',
-    cardBg: 'rgba(9, 45, 37, 0.70)', // Forest green #092D25
-    cardBorder: 'rgba(114, 217, 176, 0.26)', // Emerald / Pale mint
-    accentPrimary: '#0F8B68', // Emerald #0F8B68
-    accentSecondary: '#092D25', // Forest green
-    accentHighlight: '#E9F7F0', // Pale mint
-    headerBg: 'rgba(6, 25, 20, 0.85)',
-    headerBorder: 'rgba(15, 139, 104, 0.24)',
-    ambientPrimary: 'rgba(15, 139, 104, 0.42)', // Emerald #0F8B68
-    ambientSecondary: 'rgba(9, 45, 37, 0.60)', // Forest green
-    ambientAccent: 'rgba(114, 217, 176, 0.25)', // Mint #72D9B0
+    cardBg: 'rgba(8, 14, 12, 0.76)', // Executive obsidian crystal glass
+    cardBorder: 'rgba(52, 211, 153, 0.22)', // Subtle emerald / mint rim
+    accentPrimary: '#10B981', // Emerald
+    accentSecondary: '#065F46', // Deep emerald
+    accentHighlight: '#A7F3D0', // Pale mint
+    headerBg: 'rgba(5, 12, 10, 0.85)',
+    headerBorder: 'rgba(16, 185, 129, 0.18)',
+    ambientPrimary: 'rgba(16, 185, 129, 0.30)', // Emerald aura
+    ambientSecondary: 'rgba(6, 95, 70, 0.30)', // Deep emerald glow
+    ambientAccent: 'rgba(110, 231, 183, 0.20)', // Mint sheen
     isLightMode: false,
   },
 };

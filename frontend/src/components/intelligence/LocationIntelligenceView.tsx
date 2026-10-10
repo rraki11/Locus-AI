@@ -505,10 +505,10 @@ export const LocationIntelligenceView: React.FC<
                       onClick={() => setSelectedFactorKey(factor.key)}
                       className={`w-full rounded-2xl border p-3 text-left transition-all ${
                         isSelected
-                          ? 'border-[#E879F9]/60 bg-white/[0.06] shadow-[0_0_20px_rgba(168,85,247,0.2)]'
+                          ? 'border-cyan-400/70 border-t-white/30 bg-gradient-to-r from-cyan-500/20 via-sky-500/10 to-transparent shadow-[0_0_24px_rgba(56,189,248,0.25),inset_0_1px_0_0_rgba(255,255,255,0.22)]'
                           : factor.changed_from_baseline
-                          ? 'border-[#FB923C]/45 bg-[#F97316]/[0.07] hover:border-[#FB923C]/70'
-                          : 'border-white/[0.07] bg-white/[0.025] hover:border-white/20'
+                          ? 'border-[#FB923C]/50 border-t-white/20 bg-gradient-to-r from-[#F97316]/15 via-amber-500/10 to-transparent hover:border-[#FB923C]/75 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)]'
+                          : 'border-white/[0.09] border-t-white/18 bg-white/[0.035] hover:border-cyan-400/40 hover:bg-white/[0.06] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -550,9 +550,9 @@ export const LocationIntelligenceView: React.FC<
               </div>
 
               {/* Selected Factor Supporting Evidence Provenance Drawer */}
-              <div className="rounded-2xl border border-white/[0.09] bg-[#070514]/80 p-3">
+              <div className="glass-sub-card rounded-2xl border-cyan-400/25 p-3.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-[#A5B4FC]">
+                  <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
                     Evidence Provenance · {selectedFactor.label}
                   </span>
                   <span className="font-mono text-[9.5px] text-slate-400">
@@ -562,7 +562,7 @@ export const LocationIntelligenceView: React.FC<
                 <ul className="mt-1.5 space-y-1 font-mono text-[10.5px] text-slate-300">
                   {selectedFactor.supporting_evidence.map((line, idx) => (
                     <li key={idx} className="flex items-start gap-1.5">
-                      <span className="text-[#FB923C]">·</span>
+                      <span className="text-cyan-400">·</span>
                       <span>{line}</span>
                     </li>
                   ))}
@@ -709,7 +709,7 @@ export const LocationIntelligenceView: React.FC<
               </div>
 
               {/* Three Scenario Variable Sliders */}
-              <div className="space-y-3.5 rounded-2xl border border-white/[0.09] bg-white/[0.025] p-3.5">
+              <div className="glass-sub-card space-y-4 rounded-2xl p-4">
                 {/* 1. RENT ASSUMPTION */}
                 <div>
                   <div className="flex items-center justify-between text-xs">
