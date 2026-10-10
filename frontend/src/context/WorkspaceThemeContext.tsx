@@ -39,8 +39,8 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     accentPrimary: '#10B981', // Emerald
     accentSecondary: '#065F46', // Deep emerald
     accentHighlight: '#6EE7B7', // Mint
-    headerBg: 'rgba(5, 12, 10, 0.85)',
-    headerBorder: 'rgba(52, 211, 153, 0.16)',
+    headerBg: 'rgba(5, 12, 10, 0.88)',
+    headerBorder: 'rgba(52, 211, 153, 0.14)',
     ambientPrimary: 'rgba(16, 185, 129, 0.28)', // Emerald aura
     ambientSecondary: 'rgba(6, 95, 70, 0.30)', // Deep emerald glow
     ambientAccent: 'rgba(110, 231, 183, 0.22)', // Mint sheen
@@ -59,8 +59,8 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     accentPrimary: '#14B8A6', // Teal
     accentSecondary: '#0D9488', // Cyan-teal
     accentHighlight: '#5EEAD4', // Bright cyan-mint highlight
-    headerBg: 'rgba(6, 12, 18, 0.85)',
-    headerBorder: 'rgba(45, 212, 191, 0.16)',
+    headerBg: 'rgba(6, 12, 18, 0.88)',
+    headerBorder: 'rgba(45, 212, 191, 0.14)',
     ambientPrimary: 'rgba(20, 184, 166, 0.28)', // Cyber teal
     ambientSecondary: 'rgba(14, 165, 233, 0.24)', // Electric sky
     ambientAccent: 'rgba(94, 234, 212, 0.20)', // Mint sheen
@@ -79,8 +79,8 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     accentPrimary: '#38BDF8', // Electric cyan
     accentSecondary: '#1E40AF', // Deep sapphire
     accentHighlight: '#BAE6FD', // Pale ice blue
-    headerBg: 'rgba(6, 12, 22, 0.85)',
-    headerBorder: 'rgba(56, 189, 248, 0.16)',
+    headerBg: 'rgba(6, 12, 22, 0.88)',
+    headerBorder: 'rgba(56, 189, 248, 0.14)',
     ambientPrimary: 'rgba(56, 189, 248, 0.28)', // Electric cyan
     ambientSecondary: 'rgba(30, 64, 175, 0.28)', // Deep sapphire glow
     ambientAccent: 'rgba(125, 211, 252, 0.22)', // Pale blue sheen
@@ -99,8 +99,8 @@ export const STAGE_THEMES: Record<WorkspaceViewKey, StageThemeSpec> = {
     accentPrimary: '#10B981', // Emerald
     accentSecondary: '#065F46', // Deep emerald
     accentHighlight: '#A7F3D0', // Pale mint
-    headerBg: 'rgba(5, 12, 10, 0.85)',
-    headerBorder: 'rgba(16, 185, 129, 0.18)',
+    headerBg: 'rgba(5, 12, 10, 0.88)',
+    headerBorder: 'rgba(52, 211, 153, 0.14)',
     ambientPrimary: 'rgba(16, 185, 129, 0.30)', // Emerald aura
     ambientSecondary: 'rgba(6, 95, 70, 0.30)', // Deep emerald glow
     ambientAccent: 'rgba(110, 231, 183, 0.20)', // Mint sheen

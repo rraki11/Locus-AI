@@ -37,11 +37,11 @@ export const STAGE_CONFIGS: WorkspaceStageConfig[] = [
     tagline: 'Candidate Census & Spatial Map',
     shortTag: 'EMERALD SPATIAL',
     themeColor: '#0F8B68',
-    activeBorder: 'border-white/12 border-t-emerald-300/35 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.7)]',
-    activeBg: 'bg-emerald-500/15 text-[#E9F7F0]',
-    activeBadge: 'border-emerald-400/35 bg-emerald-500/20 text-[#A7F3D0]',
-    activeGlow: 'from-emerald-500/15 via-white/[0.02] to-transparent',
-    dotColor: 'bg-[#72D9B0] shadow-[0_0_8px_rgba(114,217,176,0.9)]',
+    activeBorder: 'border-emerald-500/25',
+    activeBg: 'bg-emerald-500/[0.12] text-[#E9F7F0]',
+    activeBadge: 'border-emerald-500/30 bg-emerald-500/15 text-[#A7F3D0]',
+    activeGlow: 'from-emerald-500/[0.08] via-transparent to-transparent',
+    dotColor: 'bg-[#72D9B0] shadow-[0_0_6px_rgba(114,217,176,0.6)]',
     icon: MapPin,
   },
   {
@@ -52,11 +52,11 @@ export const STAGE_CONFIGS: WorkspaceStageConfig[] = [
     tagline: 'Street Scan & CV Storefront Fusion',
     shortTag: 'CYBER AURORA',
     themeColor: '#14B8A6',
-    activeBorder: 'border-white/12 border-t-teal-300/35 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.7)]',
-    activeBg: 'bg-teal-500/15 text-[#A7F3D0]',
-    activeBadge: 'border-teal-400/35 bg-teal-500/20 text-[#5EEAD4]',
-    activeGlow: 'from-teal-500/15 via-sky-500/10 to-transparent',
-    dotColor: 'bg-[#5EEAD4] shadow-[0_0_8px_rgba(94,234,212,0.9)]',
+    activeBorder: 'border-teal-500/25',
+    activeBg: 'bg-teal-500/[0.12] text-[#A7F3D0]',
+    activeBadge: 'border-teal-500/30 bg-teal-500/15 text-[#5EEAD4]',
+    activeGlow: 'from-teal-500/[0.08] via-transparent to-transparent',
+    dotColor: 'bg-[#5EEAD4] shadow-[0_0_6px_rgba(94,234,212,0.6)]',
     icon: Video,
   },
   {
@@ -67,11 +67,11 @@ export const STAGE_CONFIGS: WorkspaceStageConfig[] = [
     tagline: '8-Factor Model & Scenario Engine',
     shortTag: 'MIDNIGHT BLUE & CYAN',
     themeColor: '#38BDF8',
-    activeBorder: 'border-white/12 border-t-cyan-300/35 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.7)]',
-    activeBg: 'bg-sky-500/15 text-[#DDF6FA]',
-    activeBadge: 'border-sky-400/35 bg-sky-500/20 text-[#BAE6FD]',
-    activeGlow: 'from-sky-500/18 via-indigo-500/10 to-transparent',
-    dotColor: 'bg-[#38BDF8] shadow-[0_0_8px_rgba(56,189,248,0.95)]',
+    activeBorder: 'border-cyan-500/25',
+    activeBg: 'bg-sky-500/[0.12] text-[#DDF6FA]',
+    activeBadge: 'border-sky-500/30 bg-sky-500/15 text-[#BAE6FD]',
+    activeGlow: 'from-sky-500/[0.08] via-transparent to-transparent',
+    dotColor: 'bg-[#38BDF8] shadow-[0_0_6px_rgba(56,189,248,0.6)]',
     icon: Cpu,
   },
   {
@@ -82,11 +82,11 @@ export const STAGE_CONFIGS: WorkspaceStageConfig[] = [
     tagline: 'Explainable Market Entry Verdict',
     shortTag: 'EMERALD EXECUTIVE AUDIT',
     themeColor: '#10B981',
-    activeBorder: 'border-white/12 border-t-emerald-300/35 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.7)]',
-    activeBg: 'bg-emerald-500/15 text-[#E9F7F0]',
-    activeBadge: 'border-emerald-400/35 bg-emerald-500/20 text-[#E9F7F0]',
-    activeGlow: 'from-emerald-500/15 via-white/[0.02] to-transparent',
-    dotColor: 'bg-[#72D9B0] shadow-[0_0_8px_rgba(114,217,176,0.9)]',
+    activeBorder: 'border-emerald-500/25',
+    activeBg: 'bg-emerald-500/[0.12] text-[#E9F7F0]',
+    activeBadge: 'border-emerald-500/30 bg-emerald-500/15 text-[#E9F7F0]',
+    activeGlow: 'from-emerald-500/[0.08] via-transparent to-transparent',
+    dotColor: 'bg-[#72D9B0] shadow-[0_0_6px_rgba(114,217,176,0.6)]',
     icon: FileCheck2,
   },
 ];
@@ -144,13 +144,13 @@ export const WorkspaceStageNav: React.FC<WorkspaceStageNavProps> = ({
                 disabled={!isUnlocked}
                 onClick={() => isUnlocked && onNavigate?.(stage.viewKey)}
                 title={`${stage.code} ${stage.label} — ${stage.tagline}`}
-                className={`group flex items-center gap-2 rounded-xl px-2.5 py-1 text-xs transition-all ${
+                className={`group flex items-center gap-2 rounded-lg px-2.5 py-1 text-xs transition-all ${
                   isActive
                     ? `border ${stage.activeBorder} ${stage.activeBg} font-semibold text-white shadow-sm`
                     : isPassed
-                    ? 'border border-emerald-400/25 bg-emerald-500/[0.08] text-slate-200 hover:border-emerald-400/50 hover:bg-emerald-500/15 cursor-pointer'
+                    ? 'border border-emerald-500/20 bg-emerald-500/[0.06] text-slate-200 hover:border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer'
                     : isUnlocked
-                    ? 'border border-white/10 bg-white/[0.04] text-slate-300 hover:border-white/20 hover:text-white cursor-pointer'
+                    ? 'border border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/20 hover:text-white cursor-pointer'
                     : 'border border-white/[0.05] bg-white/[0.015] text-slate-500 opacity-60 cursor-not-allowed'
                 }`}
               >
@@ -193,7 +193,7 @@ export const WorkspaceStageNav: React.FC<WorkspaceStageNavProps> = ({
               {idx < STAGE_CONFIGS.length - 1 && (
                 <span
                   className={`text-[11px] select-none ${
-                    idx < currentIndex ? 'text-emerald-400/50' : 'text-slate-600'
+                    idx < currentIndex ? 'text-emerald-400/40' : 'text-slate-600'
                   }`}
                   aria-hidden="true"
                 >
@@ -211,7 +211,7 @@ export const WorkspaceStageNav: React.FC<WorkspaceStageNavProps> = ({
           <button
             type="button"
             onClick={() => onNavigate?.(prevConfig.viewKey)}
-            className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-[11px] text-slate-300 transition-all hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
+            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[11px] text-slate-300 transition-all hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
             title={`Go back to ${prevConfig.code} ${prevConfig.label}`}
           >
             <ArrowLeft className="h-3 w-3 text-slate-400" />
@@ -224,7 +224,7 @@ export const WorkspaceStageNav: React.FC<WorkspaceStageNavProps> = ({
           <button
             type="button"
             onClick={() => onNavigate?.(nextConfig.viewKey)}
-            className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 font-mono text-[11px] font-semibold transition-all hover:brightness-110 ${nextConfig.activeBadge}`}
+            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 font-mono text-[11px] font-medium transition-all hover:brightness-110 ${nextConfig.activeBadge}`}
             title={`Advance forward to ${nextConfig.code} ${nextConfig.label}`}
           >
             <span>Next</span>
@@ -271,13 +271,13 @@ export const WorkspaceStageHero: React.FC<WorkspaceStageHeroProps> = ({
 
   return (
     <div
-      className={`relative mb-4 overflow-hidden rounded-2xl border px-4 py-3 sm:px-6 sm:py-3.5 transition-all duration-[850ms] ${currentConfig.activeBorder} bg-gradient-to-r ${currentConfig.activeGlow} bg-[var(--stage-header-bg,#061914)] backdrop-blur-md`}
+      className="relative mb-4 overflow-hidden rounded-2xl border border-[var(--stage-header-border,rgba(255,255,255,0.12))] bg-[var(--stage-header-bg,rgba(6,20,16,0.85))] px-4 py-3 sm:px-6 sm:py-3.5 backdrop-blur-xl transition-all duration-[850ms] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: Stage Visual Stamp & Scope Summary */}
         <div className="flex items-center gap-3">
           <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border font-mono text-sm font-bold ${currentConfig.activeBadge}`}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border font-mono text-xs font-bold ${currentConfig.activeBadge}`}
           >
             {currentConfig.code}
           </div>
@@ -322,7 +322,7 @@ export const WorkspaceStageHero: React.FC<WorkspaceStageHeroProps> = ({
             <button
               type="button"
               onClick={() => onNavigate?.(prevConfig.viewKey)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-slate-300 transition-all hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-slate-300 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
               <span>Back: {prevConfig.label}</span>
@@ -333,7 +333,7 @@ export const WorkspaceStageHero: React.FC<WorkspaceStageHeroProps> = ({
             <button
               type="button"
               onClick={() => onNavigate?.(nextConfig.viewKey)}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-md transition-all hover:brightness-110 ${nextConfig.activeBadge}`}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-all hover:brightness-110 ${nextConfig.activeBadge}`}
             >
               <span>Next: {nextConfig.label}</span>
               <ArrowRight className="h-3.5 w-3.5" />
