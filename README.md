@@ -104,48 +104,78 @@ LOCUS AI synthesizes **structured geospatial directory baselines** (Google Place
 
 ---
 
-## 🚀 Installation & Execution
+## 💻 How to Install Dependencies and Run the Project Locally
+
+Follow these steps to set up and run LOCUS AI on your local machine:
 
 ### Prerequisites
-- Node.js 18.x or 20.x
-- npm 9.x or later
+- **Node.js**: v18.x or v20.x (Recommended: v20.x)
+- **npm**: v9.x or later (included with Node.js)
+- A modern web browser (Chrome, Edge, Firefox, or Safari)
 
-### Quick Start (From Repository Root)
+---
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/rraki11/Locus-AI.git
-   cd Locus-AI
-   ```
+### Step-by-Step Setup
 
-2. **Install frontend dependencies:**
-   ```bash
-   cd frontend
-   npm install
-   ```
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/rraki11/Locus-AI.git
+cd Locus-AI
+```
 
-3. **Configure Environment Variables (Optional):**
-   Copy the example environment file:
-   ```bash
-   cp .env.example .env.local
-   ```
-   Add your Google Maps Platform API key (if evaluating live Google Places data):
-   ```env
-   GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
-   ```
-   > **Note:** If no key is provided, LOCUS AI automatically operates in **Calibrated Demo Mode** using rich, geographically accurate Indian commercial corridor presets.
+#### 2. Install Dependencies
+You can install dependencies using either method:
 
-4. **Start the local development server:**
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:5173](http://localhost:5173) in your browser.
+**Option A (Standard - From `frontend` folder):**
+```bash
+cd frontend
+npm install
+```
 
-5. **Production Build & Verification:**
-   ```bash
-   npm run build
-   ```
-   This compiles TypeScript in project mode and builds the optimized bundle via Vite.
+**Option B (Convenience - From project root):**
+```bash
+npm install --prefix frontend
+```
+
+#### 3. Configure Environment Variables (Optional)
+LOCUS AI runs **100% out of the box** without any external API keys in **Calibrated Demo Mode** (pre-configured with high-fidelity commercial corridor presets across major Indian cities).
+
+If you want to connect live **Google Places API** data:
+```bash
+# In the frontend/ directory:
+cp .env.example .env.local
+```
+Then open `frontend/.env.local` and add your key:
+```env
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+> **Security Note:** The API key is strictly read by the backend server middleware and is **never** bundled or exposed to client-side browser code.
+
+#### 4. Run the Development Server
+**From the `frontend/` directory:**
+```bash
+npm run dev
+```
+
+*(Or from the project root: `npm run dev`)*
+
+Once started, open your browser and navigate to:
+👉 **[http://localhost:5173](http://localhost:5173)**
+
+The local Vite dev server includes active backend middleware handlers for:
+- `/api/market-baseline` (hierarchical spatial radii queries)
+- `/api/street-scan/fuse` (corridor computer-vision fusion)
+- `/api/location-intelligence/evaluate` (8-factor multi-source matrix)
+
+#### 5. Build for Production & Preview Locally
+To verify TypeScript compilation and run the production build locally:
+
+```bash
+# Inside frontend/ (or from root):
+npm run build
+npm run preview
+```
+This runs `tsc -b` and `vite build`, bundling all assets into `frontend/dist`, and serves the production bundle locally at [http://localhost:4173](http://localhost:4173).
 
 ---
 
