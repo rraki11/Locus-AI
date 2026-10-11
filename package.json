@@ -1,0 +1,11 @@
+{
+  "name": "locus-ai",
+  "private": true,
+  "version": "1.0.0",
+  "description": "LOCUS AI — Multi-Modal Market Entry & Ground Reality Location Intelligence",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview"
+  }
+}

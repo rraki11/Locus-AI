@@ -140,6 +140,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
   // Video state
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
   const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
+  const lastVideoFileRef = useRef<File | null>(null);
 
   // Fusion and previews
   const [fusionResult, setFusionResult] =
@@ -436,10 +437,15 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
       setSelectedPhotoIndex(0);
     } catch (err: any) {
       setPipelineStage('ERROR');
-      setErrorMessage(
-        err?.message ||
-          'Could not complete photo batch scan. Please ensure photos are valid JPG/PNG/WebP storefront views.'
-      );
+      const rawMsg = String(err?.message || err || '');
+      const friendlyMsg =
+        rawMsg.includes('Failed to fetch') || rawMsg.includes('network')
+          ? 'Network connection was interrupted during corridor analysis. Your uploaded photos are preserved; click Retry below to resume.'
+          : rawMsg.includes('500') || rawMsg.includes('JSON')
+          ? 'Corridor fusion encountered a temporary processing glitch. Your uploaded photos are preserved; click Retry below to resume.'
+          : rawMsg ||
+            'Could not complete photo batch scan. Please ensure photos are valid JPG/PNG/WebP storefront views.';
+      setErrorMessage(friendlyMsg);
       setPhotoQueue((prev) =>
         prev.map((p) =>
           p.status === 'PROCESSING' ? { ...p, status: 'ERROR' } : p
@@ -477,6 +483,7 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
       const nextUrl = URL.createObjectURL(file);
       setUploadedVideoUrl(nextUrl);
       setUploadedFilename(file.name);
+      lastVideoFileRef.current = file;
 
       try {
         const { fusionResponse, framePreviews: nextFrames } =
@@ -507,10 +514,15 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
         setSelectedFrameIndex(firstOcrFrame?.frame_index ?? 1);
       } catch (err: any) {
         setPipelineStage('ERROR');
-        setErrorMessage(
-          err?.message ||
-            'Could not process video file. You can retry with another MP4/MOV or run the explicitly labeled Calibrated Demo Scan.'
-        );
+        const rawMsg = String(err?.message || err || '');
+        const friendlyMsg =
+          rawMsg.includes('Failed to fetch') || rawMsg.includes('network')
+            ? 'Network connection was interrupted during video analysis. Click Retry Video Scan below to resume.'
+            : rawMsg.includes('500') || rawMsg.includes('JSON')
+            ? 'Corridor fusion encountered a temporary processing glitch. Click Retry Video Scan below to resume.'
+            : rawMsg ||
+              'Could not process video file. You can retry the video scan or run the explicitly labeled Calibrated Demo Scan.';
+        setErrorMessage(friendlyMsg);
       } finally {
         scanInProgressRef.current = false;
       }
@@ -1609,17 +1621,30 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
                       <span className="flex-1 leading-relaxed">{errorMessage}</span>
                     </div>
-                    {photoQueue.length >= 5 && (
-                      <button
-                        type="button"
-                        disabled={isRunning}
-                        onClick={() => void handleRunPhotoBatch()}
-                        className="inline-flex items-center gap-1.5 self-start rounded-lg border border-amber-400/50 bg-amber-500/20 px-3 py-1 font-mono text-[11px] font-semibold text-amber-100 transition-all hover:bg-amber-500/30 disabled:opacity-50"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        Retry Corridor Fusion ({photoQueue.length} Photos Kept)
-                      </button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {inputMode === 'PHOTOS' && photoQueue.length >= 5 && (
+                        <button
+                          type="button"
+                          disabled={isRunning}
+                          onClick={() => void handleRunPhotoBatch()}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/20 px-3 py-1 font-mono text-[11px] font-semibold text-amber-100 transition-all hover:bg-amber-500/30 disabled:opacity-50"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          Retry Corridor Fusion ({photoQueue.length} Photos Kept)
+                        </button>
+                      )}
+                      {inputMode === 'VIDEO' && lastVideoFileRef.current && (
+                        <button
+                          type="button"
+                          disabled={isRunning}
+                          onClick={() => void handleVideoFileSelected(lastVideoFileRef.current!)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/20 px-3 py-1 font-mono text-[11px] font-semibold text-amber-100 transition-all hover:bg-amber-500/30 disabled:opacity-50"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          Retry Video Scan ({lastVideoFileRef.current.name})
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 

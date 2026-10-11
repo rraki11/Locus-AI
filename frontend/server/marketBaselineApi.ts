@@ -940,10 +940,20 @@ export function createMarketBaselineMiddleware(
           : ({} as Record<string, any>);
 
       const lat = Number(
-        body.latitude ?? parsedUrl.searchParams.get('latitude') ?? NaN
+        body.latitude ??
+          body.lat ??
+          body.coordinates?.lat ??
+          parsedUrl.searchParams.get('latitude') ??
+          parsedUrl.searchParams.get('lat') ??
+          NaN
       );
       const lng = Number(
-        body.longitude ?? parsedUrl.searchParams.get('longitude') ?? NaN
+        body.longitude ??
+          body.lng ??
+          body.coordinates?.lng ??
+          parsedUrl.searchParams.get('longitude') ??
+          parsedUrl.searchParams.get('lng') ??
+          NaN
       );
       const businessType = String(
         body.business_type ??
