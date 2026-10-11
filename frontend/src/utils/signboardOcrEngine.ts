@@ -208,12 +208,19 @@ export function generatePreprocessingVariants(
   const w = baseCropCanvas.width;
   const h = baseCropCanvas.height;
 
-  // Helper to clone canvas
+  // Helper to clone canvas. Throws if the browser cannot allocate a 2D context
+  // (e.g. GPU memory exhausted from too many simultaneous canvases), allowing the
+  // per-crop try-catch in the caller to skip this crop gracefully.
   function createVariantCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      canvas.width = 0;
+      canvas.height = 0;
+      throw new Error('Canvas 2D context unavailable (GPU memory limit reached)');
+    }
     ctx.drawImage(baseCropCanvas, 0, 0);
     return { canvas, ctx };
   }

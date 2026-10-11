@@ -1223,7 +1223,10 @@ export async function runPhotoBatchStreetScan(params: {
       cocoCanvas.width = targetW;
       cocoCanvas.height = targetH;
       const cocoCtx = cocoCanvas.getContext('2d', { willReadFrequently: true });
-      if (!cocoCtx) throw new Error('Canvas 2D context unavailable.');
+      if (!cocoCtx) {
+        console.warn(`[StreetScan] Canvas 2D context unavailable for photo ${idx + 1} ("${file.name}"). Skipping this photo.`);
+        continue;
+      }
       cocoCtx.drawImage(img, 0, 0, targetW, targetH);
 
       const { sharpness, upperContrast } =
@@ -1243,6 +1246,9 @@ export async function runPhotoBatchStreetScan(params: {
             box: cBox.box,
             variants,
           });
+          // Release cropCanvas GPU memory after variants are captured as data URLs
+          cropCanvas.width = 0;
+          cropCanvas.height = 0;
         } catch {
           // Skip individual crop on failure
         }
@@ -1267,9 +1273,22 @@ export async function runPhotoBatchStreetScan(params: {
         ocr_reads: [],
         ocr_sampled: true,
       });
-    } finally {
-      // Keep object URL active for previews
+
+      // Release the COCO preview canvas GPU memory after extracting data URLs
+      cocoCanvas.width = 0;
+      cocoCanvas.height = 0;
+    } catch (imgErr: any) {
+      // Individual photo failed to load or process — skip it and continue with remaining photos
+      console.warn(`[StreetScan] Failed to process photo ${idx + 1} ("${file.name}"):`, imgErr?.message || imgErr);
+      // Keep objectUrl alive for the preview queue; do NOT revoke here
     }
+  }
+
+  // Validate that at least one photo was successfully processed before continuing to fusion
+  if (processedFrames.length === 0) {
+    throw new Error(
+      `None of the ${files.length} photos could be processed. Please ensure photos are valid JPG/PNG/WebP files and try again.`
+    );
   }
 
   // Step 2: COCO Object Detection across photos
