@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createLocationIntelligenceMiddleware } from '../../backend/locationIntelligenceApi';
+import { createLocationIntelligenceMiddleware } from '../../server/locationIntelligenceApi';
 
 const middleware = createLocationIntelligenceMiddleware();
 
@@ -22,6 +22,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return nodeReq;
     };
   }
+
+  // Normalize URL for middleware pathname check
+  nodeReq.url = nodeReq.url || '/api/location-intelligence/evaluate';
 
   await middleware(nodeReq, nodeRes, () => {
     res.status(404).json({ error: 'Endpoint not found' });

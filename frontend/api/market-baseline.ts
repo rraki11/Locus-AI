@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createMarketBaselineMiddleware } from '../../backend/marketBaselineApi';
+import { createMarketBaselineMiddleware } from '../server/marketBaselineApi';
 
 const middleware = createMarketBaselineMiddleware(process.env as Record<string, string>);
 
@@ -26,6 +26,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return nodeReq;
     };
   }
+
+  // Ensure url is set for middleware matching
+  nodeReq.url = nodeReq.url || '/api/market-baseline';
 
   await middleware(nodeReq, nodeRes, () => {
     res.status(404).json({ error: 'Endpoint not found' });

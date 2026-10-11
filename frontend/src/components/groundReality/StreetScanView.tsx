@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Layers,
   Plus,
+  RotateCcw,
   Sparkles,
   Trash2,
   Upload,
@@ -1602,10 +1603,23 @@ export const StreetScanView: React.FC<StreetScanViewProps> = ({
                 {errorMessage && (
                   <div
                     role="alert"
-                    className="mt-2 flex items-start gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 p-2.5 text-xs text-amber-200 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]"
+                    className="mt-2 flex flex-col gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 p-2.5 text-xs text-amber-200 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]"
                   >
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-                    <span>{errorMessage}</span>
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                      <span className="flex-1 leading-relaxed">{errorMessage}</span>
+                    </div>
+                    {photoQueue.length >= 5 && (
+                      <button
+                        type="button"
+                        disabled={isRunning}
+                        onClick={() => void handleRunPhotoBatch()}
+                        className="inline-flex items-center gap-1.5 self-start rounded-lg border border-amber-400/50 bg-amber-500/20 px-3 py-1 font-mono text-[11px] font-semibold text-amber-100 transition-all hover:bg-amber-500/30 disabled:opacity-50"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Retry Corridor Fusion ({photoQueue.length} Photos Kept)
+                      </button>
+                    )}
                   </div>
                 )}
 

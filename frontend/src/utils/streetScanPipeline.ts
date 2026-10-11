@@ -550,6 +550,33 @@ export async function initMultilingualTesseractWorker(
   return { worker, activeLangs, sourceMode, langWarning };
 }
 
+async function extractFusionErrorMessage(res: Response): Promise<string> {
+  let message = `Fusion API returned ${res.status}`;
+  try {
+    const data = await res.json();
+    if (data && typeof data === 'object') {
+      if (typeof data.error === 'string' && data.error.trim()) {
+        message = data.error.trim();
+        if (typeof data.details === 'string' && data.details.trim()) {
+          message += `: ${data.details.trim()}`;
+        }
+      } else if (typeof data.message === 'string' && data.message.trim()) {
+        message = data.message.trim();
+      }
+    }
+  } catch {
+    try {
+      const text = await res.text();
+      if (text && text.trim().length > 0 && text.length < 300) {
+        message = text.trim();
+      }
+    } catch {
+      // keep fallback
+    }
+  }
+  return message;
+}
+
 /**
  * Runs the end-to-end Live Video Street Scan pipeline in the browser and fuses via /api/street-scan/fuse.
  */
@@ -1056,7 +1083,8 @@ export async function runLiveVideoStreetScan(params: {
     });
 
     if (!res.ok) {
-      throw new Error(`Fusion API returned ${res.status}`);
+      const errorMsg = await extractFusionErrorMessage(res);
+      throw new Error(errorMsg);
     }
 
     const fusionResponse = (await res.json()) as StreetScanFusionResponse;
@@ -1497,7 +1525,8 @@ export async function runPhotoBatchStreetScan(params: {
   });
 
   if (!res.ok) {
-    throw new Error(`Fusion API returned ${res.status}`);
+    const errorMsg = await extractFusionErrorMessage(res);
+    throw new Error(errorMsg);
   }
 
   const fusionResponse = (await res.json()) as StreetScanFusionResponse;
@@ -1803,7 +1832,8 @@ export async function runCalibratedDemoStreetScan(params: {
   });
 
   if (!res.ok) {
-    throw new Error(`Fusion API returned ${res.status}`);
+    const errorMsg = await extractFusionErrorMessage(res);
+    throw new Error(errorMsg);
   }
 
   const fusionResponse = (await res.json()) as StreetScanFusionResponse;
