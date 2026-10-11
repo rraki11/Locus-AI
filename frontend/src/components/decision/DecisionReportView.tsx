@@ -91,61 +91,107 @@ const RISK_RATING_BADGE_STYLE: Record<CategoricalLevel, string> = {
 
 /**
  * Maps decision outcome and posture to user-friendly business owner terminology:
- * Promising | Needs validation | Insufficient evidence
+ * - "Analysis Based on Available Information" when data is partial/limited
+ * - "Promising" or "Needs validation" when data is fully verified
+ * Accompanied by an unobtrusive data quality label and explicit analytical posture.
  */
 function getBusinessOwnerVerdict(
   shortPosture: ShortDecisionPosture,
   isProvisional: boolean,
-  outcome: PlainLanguageOutcome
+  outcome: PlainLanguageOutcome,
+  streetScanExecuted: boolean,
+  dataMode: 'LIVE' | 'DEMO',
+  totalMapped: number
 ): {
-  title: 'Promising' | 'Needs validation' | 'Insufficient evidence';
-  theme: 'emerald' | 'amber' | 'rose' | 'slate';
-  cardBorder: string;
+  headline: string;
+  supportingExplanation: string;
+  dataQualityLabel: 'Limited data' | 'Partially verified' | 'Verified data';
+  dataQualityBadgeClass: string;
   badgeClass: string;
-  pillClass: string;
-  accentText: string;
+  cardBorder: string;
+  postureTextClass: string;
   icon: 'check' | 'alert' | 'info';
 } {
-  if (isProvisional || outcome === 'NOT ENOUGH INFORMATION YET') {
+  const isLimited =
+    isProvisional ||
+    outcome === 'NOT ENOUGH INFORMATION YET' ||
+    dataMode === 'DEMO' ||
+    totalMapped < 3;
+
+  if (isLimited) {
+    const dataQualityLabel: 'Limited data' | 'Partially verified' =
+      streetScanExecuted ? 'Partially verified' : 'Limited data';
+
+    const supportingExplanation = streetScanExecuted
+      ? 'Because complete market information is not available for this location, LOCUS AI has combined your uploaded street photos or video with available public market information to assess the area, identify potential competitors, and highlight opportunities and risks. Some business details could not be independently verified.'
+      : 'Because complete market information is not available for this location, LOCUS AI has used available public market information to assess the area, identify potential competitors, and highlight opportunities and risks. Street-level photos or video were not provided, so physical storefronts could not be independently verified.';
+
+    const postureTextClass =
+      shortPosture === 'FAVORABLE'
+        ? 'text-emerald-300'
+        : shortPosture === 'WEAK'
+        ? 'text-rose-300'
+        : 'text-amber-300';
+
     return {
-      title: 'Insufficient evidence',
-      theme: 'slate',
-      cardBorder: 'border-slate-500/40 shadow-[0_12px_40px_rgba(100,116,139,0.15)]',
-      badgeClass: 'border-slate-500/50 bg-slate-500/20 text-slate-200',
-      pillClass: 'border-slate-500/40 bg-slate-500/10 text-slate-300',
-      accentText: 'text-slate-300',
+      headline: 'Analysis Based on Available Information',
+      supportingExplanation,
+      dataQualityLabel,
+      dataQualityBadgeClass:
+        'border-amber-400/35 bg-amber-500/10 text-amber-200',
+      badgeClass: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
+      cardBorder:
+        'border-emerald-500/25 shadow-[0_16px_45px_rgba(16,185,129,0.12)]',
+      postureTextClass,
       icon: 'info',
     };
   }
+
+  // Complete and verified live data
+  const dataQualityLabel = 'Verified data';
+  const dataQualityBadgeClass =
+    'border-emerald-400/40 bg-emerald-500/15 text-emerald-200';
+
   if (shortPosture === 'FAVORABLE' || outcome === 'LOOKS PROMISING') {
     return {
-      title: 'Promising',
-      theme: 'emerald',
-      cardBorder: 'border-emerald-400/45 shadow-[0_16px_50px_rgba(16,185,129,0.18)]',
+      headline: 'Promising',
+      supportingExplanation:
+        'Market baseline and local commercial signals indicate positive customer fit and supportive commercial activity for this location. Proceed with on-site lease verification.',
+      dataQualityLabel,
+      dataQualityBadgeClass,
       badgeClass: 'border-emerald-400/50 bg-emerald-500/20 text-emerald-200',
-      pillClass: 'border-emerald-400/35 bg-emerald-500/10 text-emerald-300',
-      accentText: 'text-emerald-300',
+      cardBorder:
+        'border-emerald-400/45 shadow-[0_16px_50px_rgba(16,185,129,0.18)]',
+      postureTextClass: 'text-emerald-300',
       icon: 'check',
     };
   }
+
   if (shortPosture === 'WEAK' || outcome === 'CONSIDER ANOTHER LOCATION') {
     return {
-      title: 'Needs validation',
-      theme: 'rose',
-      cardBorder: 'border-rose-400/45 shadow-[0_16px_50px_rgba(244,63,94,0.18)]',
+      headline: 'Needs validation',
+      supportingExplanation:
+        'Market baseline indicates high competitive density or structural rent pressure relative to your business profile. Consider alternative micro-markets or significant format differentiation.',
+      dataQualityLabel,
+      dataQualityBadgeClass,
       badgeClass: 'border-rose-400/50 bg-rose-500/20 text-rose-200',
-      pillClass: 'border-rose-400/35 bg-rose-500/10 text-rose-300',
-      accentText: 'text-rose-300',
+      cardBorder:
+        'border-rose-400/45 shadow-[0_16px_50px_rgba(244,63,94,0.18)]',
+      postureTextClass: 'text-rose-300',
       icon: 'alert',
     };
   }
+
   return {
-    title: 'Needs validation',
-    theme: 'amber',
-    cardBorder: 'border-amber-400/45 shadow-[0_16px_50px_rgba(245,158,11,0.18)]',
+    headline: 'Needs validation',
+    supportingExplanation:
+      'The location shows active commercial presence alongside competitive density. Viability depends on format differentiation and verifying landlord lease quotes.',
+    dataQualityLabel,
+    dataQualityBadgeClass,
     badgeClass: 'border-amber-400/50 bg-amber-500/20 text-amber-200',
-    pillClass: 'border-amber-400/35 bg-amber-500/10 text-amber-300',
-    accentText: 'text-amber-300',
+    cardBorder:
+      'border-amber-400/45 shadow-[0_16px_50px_rgba(245,158,11,0.18)]',
+    postureTextClass: 'text-amber-300',
     icon: 'alert',
   };
 }
@@ -192,12 +238,18 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
       getBusinessOwnerVerdict(
         report.summary.short_posture,
         report.executiveSummary.is_provisional,
-        report.executiveSummary.outcome
+        report.executiveSummary.outcome,
+        report.street_scan_executed,
+        report.data_mode,
+        report.marketOverview.total_mapped
       ),
     [
       report.summary.short_posture,
       report.executiveSummary.is_provisional,
       report.executiveSummary.outcome,
+      report.street_scan_executed,
+      report.data_mode,
+      report.marketOverview.total_mapped,
     ]
   );
 
@@ -357,25 +409,21 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
         <section
           data-testid="report-executive-summary"
           aria-label="Executive Decision Verdict"
-          className={`liquid-glass-dark rounded-3xl border p-6 sm:p-8 space-y-6 ${verdict.cardBorder} print:p-4 print:space-y-3 print:rounded-xl print:shadow-none print:break-inside-avoid`}
+          className={`liquid-glass-dark rounded-3xl border p-6 sm:p-8 space-y-5 ${verdict.cardBorder} print:p-4 print:space-y-3 print:rounded-xl print:shadow-none print:break-inside-avoid`}
         >
           {/* Header Row: Candidate Metadata & Status */}
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start border-b border-white/[0.08] pb-5 print:pb-2">
-            <div className="space-y-3 flex-1">
+            <div className="space-y-3.5 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-[#F59E0B]/50 bg-[#F59E0B]/15 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#FCD34D]">
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300">
                   <Sparkles className="h-3 w-3" />
-                  EXECUTIVE VERDICT · BUSINESS BRIEF
+                  EXECUTIVE DECISION BRIEF
                 </span>
                 <span
-                  data-testid="executive-confidence-pill"
-                  className={`rounded-md border px-2.5 py-0.5 font-mono text-[9.5px] font-semibold ${
-                    report.executiveSummary.is_provisional
-                      ? 'border-amber-400/40 bg-amber-500/20 text-amber-200'
-                      : 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200'
-                  }`}
+                  data-testid="executive-data-quality-pill"
+                  className={`rounded-md border px-2.5 py-0.5 font-mono text-[9.5px] font-semibold ${verdict.dataQualityBadgeClass}`}
                 >
-                  {report.executiveSummary.confidence_label}
+                  {verdict.dataQualityLabel}
                 </span>
                 <span
                   data-testid="executive-mode-pill"
@@ -409,50 +457,47 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 </p>
               </div>
 
-              {/* One Clear Decision Posture */}
+              {/* Primary Verdict Status & Analytical Engine Posture */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <span
                   data-testid="executive-posture-badge"
-                  className={`inline-flex items-center gap-2 rounded-xl border px-4 py-1.5 font-mono text-base font-extrabold tracking-wide ${verdict.badgeClass}`}
+                  className={`inline-flex items-center gap-2 rounded-xl border px-4 py-1.5 font-mono text-sm sm:text-base font-extrabold tracking-wide ${verdict.badgeClass}`}
                 >
                   {verdict.icon === 'check' && (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
                   )}
                   {verdict.icon === 'alert' && (
-                    <AlertTriangle className="h-4 w-4 text-amber-400" />
+                    <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
                   )}
                   {verdict.icon === 'info' && (
-                    <Info className="h-4 w-4 text-slate-400" />
+                    <Info className="h-4 w-4 text-emerald-400 shrink-0" />
                   )}
-                  <span>{verdict.title}</span>
+                  <span>{verdict.headline}</span>
                 </span>
 
-                <span className="font-mono text-[11px] text-slate-400">
+                <span className="font-mono text-[11px] text-slate-300 bg-white/[0.04] border border-white/[0.08] rounded-lg px-2.5 py-1">
                   Analytical Engine Posture:{' '}
-                  <span className="font-semibold text-slate-200">
+                  <span className={`font-semibold ${verdict.postureTextClass}`}>
                     {report.summary.short_posture}
+                  </span>
+                  <span className="text-slate-400 ml-1.5 font-normal">
+                    ({report.summary.engine_posture_level})
                   </span>
                 </span>
               </div>
 
-              {/* Short, plain-language explanation of verdict */}
-              <p className="max-w-4xl text-xs sm:text-sm leading-relaxed text-slate-200 font-medium">
-                {report.executiveSummary.plain_explanation}
+              {/* One Short Supporting Paragraph (factual and reassuring) */}
+              <p className="max-w-4xl text-xs sm:text-sm leading-relaxed text-slate-200 font-normal">
+                {verdict.supportingExplanation}
               </p>
 
-              <div className="flex items-center gap-2 text-[10.5px] text-slate-400 font-mono">
+              {/* Compact limitation note near evidence summary */}
+              <div className="flex items-center gap-2 text-[10.5px] text-slate-400 font-mono pt-0.5">
                 <Info className="h-3 w-3 text-emerald-400 shrink-0" />
                 <span>
-                  Evidence-derived assessment to prioritize due diligence. Does not guarantee financial return.
+                  Evidence-derived assessment to guide due diligence. Does not guarantee financial success.
                 </span>
               </div>
-
-              {report.executiveSummary.is_provisional && (
-                <p className="text-[11.5px] leading-relaxed text-amber-300 font-mono flex items-center gap-1.5 pt-0.5">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-                  <span>{report.executiveSummary.provisional_reason}</span>
-                </p>
-              )}
             </div>
 
             {/* Quick Location Badge Card */}
@@ -514,7 +559,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 </span>
                 <span className="block text-lg font-bold text-white">
                   {report.groundReality.executed
-                    ? `${report.groundReality.counts.observed_entities} storefronts`
+                    ? `${report.groundReality.counts.observed_entities} observations detected`
                     : 'Unavailable'}
                 </span>
                 <span className="block text-[9.5px] text-slate-400 truncate">
@@ -531,12 +576,16 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 </span>
                 <span className="block text-lg font-bold text-white">
                   {report.groundReality.executed
-                    ? `${report.nearbyCompetitors.reliable_observed_names_count} identified`
+                    ? report.nearbyCompetitors.reliable_observed_names_count > 0
+                      ? `${report.nearbyCompetitors.reliable_observed_names_count} identified`
+                      : 'None identified'
                     : 'Not verified'}
                 </span>
                 <span className="block text-[9.5px] text-slate-400 truncate">
                   {report.groundReality.executed
-                    ? `${report.nearbyCompetitors.unidentified_storefronts_count} unidentified storefronts`
+                    ? report.nearbyCompetitors.reliable_observed_names_count === 0
+                      ? 'Business names not reliably identified'
+                      : `${report.nearbyCompetitors.unidentified_storefronts_count} unidentified storefronts`
                     : 'Requires ground footage'}
                 </span>
               </div>
@@ -649,11 +698,11 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-4 space-y-2 text-xs">
                   <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-amber-300">
                     <Info className="h-3.5 w-3.5 shrink-0" />
-                    <span>No provider listings returned</span>
+                    <span>No relevant businesses returned by the available directory source</span>
                   </div>
                   <p className="text-slate-300 leading-relaxed">
                     {report.nearbyCompetitors.empty_provider_note ||
-                      'No mapped business listings were returned by the directory provider within the 0–300m catchment. This indicates directory coverage limits or an informal/unindexed commercial strip, not proof of zero competition.'}
+                      'No relevant businesses returned by the available directory source within the 0–300m catchment. This indicates directory coverage limits or an unindexed commercial strip, not proof of zero competition.'}
                   </p>
                 </div>
               )}
@@ -749,9 +798,8 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                     {report.nearbyCompetitors.unidentified_storefronts_count >
                       0 && (
                       <p className="font-mono text-[10.5px] text-slate-400 leading-relaxed bg-white/[0.02] border border-white/[0.06] rounded-xl p-2.5">
-                        <span className="text-amber-300 font-semibold">Note on unverified signboards:</span>{' '}
-                        {report.nearbyCompetitors.unidentified_storefronts_count}{' '}
-                        observed storefronts had low-contrast or partially obscured signage. They are labeled as &quot;Unidentified storefront&quot; and not counted as category competitors without manual confirmation.
+                        <span className="text-amber-300 font-semibold">Note on storefront observations:</span>{' '}
+                        {report.groundReality.counts.observed_entities} storefront observations detected along the corridor. Visual observations indicate physical storefront presence, but do not automatically establish unique businesses or their categories.
                       </p>
                     )}
                   </div>
@@ -759,11 +807,11 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                   <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-4 space-y-2 text-xs">
                     <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-slate-300">
                       <Info className="h-3.5 w-3.5 shrink-0" />
-                      <span>No signboards reliably identified</span>
+                      <span>Business names not reliably identified</span>
                     </div>
                     <p className="text-slate-300 leading-relaxed">
                       {report.nearbyCompetitors.empty_observed_note ||
-                        'Nearby competitors could not be identified reliably from the captured corridor imagery. Signage was obscured, low contrast, or absent.'}
+                        'Business names not reliably identified from the corridor imagery. Storefront observations were detected, but signage was unreadable, low contrast, or obscured.'}
                     </p>
                   </div>
                 )
@@ -779,7 +827,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                     </span>
                   </div>
                   <p className="text-slate-200 leading-relaxed">
-                    Physical storefronts, informal stalls, and signboards along the 0–300m corridor remain unverified on the ground. Analysis operates using structured geospatial database records.
+                    Physical storefronts, informal shops, and signboards along the 0–300m corridor remain unverified on the ground. Analysis operates using available public market information.
                   </p>
                   <div className="pt-1 border-t border-indigo-400/15">
                     <button
@@ -934,7 +982,7 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 <p className="text-xs leading-relaxed text-slate-200">
                   {report.nearbyCompetitors.provider_listed.length > 0
                     ? `With ${report.nearbyCompetitors.total_identified_competitors} competitors or related businesses identified within the 0–300m corridor, viability depends on clear menu differentiation, distinctive ambiance, and pricing discipline.`
-                    : 'Registry listings returned 0 mapped competitors, which may reflect unindexed local stalls or informal vendors rather than zero competition. On-site verification is critical.'}
+                    : 'No relevant businesses returned by the available directory source. This may reflect unindexed local shops or informal vendors rather than zero competition. On-site verification is critical.'}
                 </p>
               </div>
 
@@ -950,8 +998,8 @@ export const DecisionReportView: React.FC<DecisionReportViewProps> = ({
                 </div>
                 <p className="text-xs leading-relaxed text-slate-200">
                   {report.groundReality.executed
-                    ? 'Visual evidence reflects the 0–300m camera line-of-sight corridor at the time of recording. Wider neighborhood dynamics (300m–2km) and evening trade shifts rely on provider baselines.'
-                    : 'Ground reality has not been visually verified with street footage. Physical storefront signboards, informal stalls, and peak pedestrian flow remain unconfirmed.'}
+                    ? 'Assessment combines available street-level visual observations and public market information. Visual observations reflect the 0–300m physical corridor at the time of recording.'
+                    : 'Assessment is based on available public market information. Street-level photos or video were not provided, so physical storefronts could not be independently verified.'}
                 </p>
               </div>
             </div>

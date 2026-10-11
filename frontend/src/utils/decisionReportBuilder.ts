@@ -547,6 +547,7 @@ export function buildMarketEntryReport(
   }
 
   if (streetScanFusion) {
+    const obsCount = streetScanFusion.counts.observed_entities;
     reasons.push({
       id: 'reason-ground-reality',
       polarity:
@@ -555,9 +556,9 @@ export function buildMarketEntryReport(
           : 'POSITIVE',
       headline:
         streetScanFusion.counts.additional_signals > 0
-          ? `+${streetScanFusion.counts.additional_signals} additional ground-level commercial signal(s) observed in 0–300m`
-          : `Ground-level scan confirmed ${streetScanFusion.counts.matched_entities} baseline business(es) with no hidden stalls`,
-      detail: `Street Scan observed ${streetScanFusion.counts.observed_entities} deduplicated entities and ${streetScanFusion.activity_summary.total_object_detections} COCO activity detections along the corridor.`,
+          ? `+${streetScanFusion.counts.additional_signals} street-level storefront observation(s) detected along 0–300m corridor`
+          : `Ground-level scan confirmed ${streetScanFusion.counts.matched_entities} baseline business(es) with no unmapped storefronts observed`,
+      detail: `Street Scan detected ${obsCount} storefront observation(s) and ${streetScanFusion.activity_summary.total_object_detections} visual activity detections along the corridor. Storefront presence does not confirm direct competitor status without manual verification.`,
       evidence_type: 'OBSERVED',
     });
   } else {
@@ -691,9 +692,9 @@ export function buildMarketEntryReport(
     explanationSentences.push(
       `However, ${mapped300m} similar ${mapped300m === 1 ? 'business is' : 'businesses are'} already operating within 300 metres, so local customers already have close alternatives.`
     );
-  } else if (streetScanExecuted && additionalSignals > 0) {
+  } else if (streetScanExecuted && observedEntities > 0) {
     explanationSentences.push(
-      `However, what the street video detected includes ${additionalSignals} unmapped ${additionalSignals === 1 ? 'stall or competitor' : 'stalls or competitors'} along this road that do not show up on standard maps.`
+      `Street-level scan recorded ${observedEntities} storefront observation${observedEntities === 1 ? '' : 's'} along the corridor. However, visual observations do not automatically establish unique businesses or their categories, so physical verification is needed.`
     );
   } else if (rentDelta > 0) {
     explanationSentences.push(
@@ -752,8 +753,8 @@ export function buildMarketEntryReport(
 
   if (streetScanExecuted && observedEntities > 0) {
     whyItMayWork.push({
-      point: `What the street video detected includes ${observedEntities} active storefronts and pedestrian movement along this road.`,
-      source_tag: 'What the street video detected',
+      point: `${observedEntities} storefront observation${observedEntities === 1 ? '' : 's were'} detected along the physical corridor, showing active street-level commercial presence.`,
+      source_tag: 'Street-level visual observations',
     });
   } else if (mapped300m === 0) {
     whyItMayWork.push({
@@ -777,8 +778,8 @@ export function buildMarketEntryReport(
     });
   } else if (streetScanExecuted && additionalSignals > 0) {
     whatCouldGoWrong.push({
-      point: `What the street video detected includes ${additionalSignals} unmapped informal ${additionalSignals === 1 ? 'stall' : 'stalls'} not visible on online maps.`,
-      source_tag: 'What the street video detected',
+      point: `Street scan footage detected ${observedEntities} storefront observation${observedEntities === 1 ? '' : 's'} along the corridor. Individual shop names and categories could not all be verified from footage alone.`,
+      source_tag: 'Street-level visual observations',
     });
   }
 
@@ -824,13 +825,13 @@ export function buildMarketEntryReport(
   const confidenceLabel = modeLabel;
 
   const scopeExplanation = streetScanExecuted
-    ? 'This assessment combines mapped business data with on-the-ground visual evidence from your street footage. Visual signals provide storefront and activity context along the recorded corridor.'
-    : 'This assessment uses the available map and business information to evaluate the area. A street video can add visual evidence, but it is optional. Some details, such as exact storefront visibility, informal vendors and real pedestrian activity, may require an on-site check.';
+    ? 'Because complete market information is not available for this location, LOCUS AI has combined your uploaded street photos or video with available public market information to assess the area, identify potential competitors, and highlight opportunities and risks. Some business details could not be independently verified.'
+    : 'Because complete market information is not available for this location, LOCUS AI has used available public market information to assess the area, identify potential competitors, and highlight opportunities and risks. Street-level photos or video were not provided, so physical storefronts could not be independently verified.';
 
-  const isProvisional = activeEval.data_mode === 'DEMO';
+  const isProvisional = activeEval.data_mode === 'DEMO' || totalMapped < 2;
   const provisionalReason = activeEval.data_mode === 'DEMO'
-    ? 'Market baseline uses calibrated demo registry data. Connect live Google Places API for real-time provider listings.'
-    : 'Assessment synthesized from live mapped business listings and spatial network data.';
+    ? 'Analysis is based on available public market information and calibrated baseline records. Connect live Google Places API for real-time provider listings.'
+    : 'Analysis synthesized from available mapped business listings and spatial network data.';
 
   // Neutral Evidence Coverage Summary
   const hasLivePlaces = activeEval.data_mode === 'LIVE';
@@ -1028,11 +1029,13 @@ export function buildMarketEntryReport(
 
   const emptyProviderNote =
     providerListed.length === 0
-      ? 'No mapped business listings were returned by the directory provider within the 0–300m catchment. This indicates directory coverage limits or an informal/unindexed commercial strip, not proof of zero competition.'
+      ? 'No relevant businesses returned by the available directory source within the 0–300m catchment. This indicates directory coverage limits or an unindexed commercial strip, not proof of zero competition.'
       : undefined;
 
   const emptyObservedNote = !streetScanExecuted
-    ? 'Street Scan was not executed for this candidate location. Physical storefronts, informal stalls, and signboards along the 0–300m corridor remain unverified on the ground.'
+    ? 'Street Scan was not executed for this candidate location. Physical storefronts, informal shops, and signboards along the 0–300m corridor remain unverified on the ground.'
+    : reliableObservedCount === 0 && visuallyObserved.length > 0
+    ? 'Business names not reliably identified from the corridor imagery. Storefront observations were detected, but signage was unreadable, low contrast, or obscured.'
     : visuallyObserved.length === 0
     ? 'No distinct commercial storefronts or signboards were detected along the recorded 0–300m corridor.'
     : undefined;
