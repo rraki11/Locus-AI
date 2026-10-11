@@ -75,6 +75,35 @@ export interface PlainLanguageReasonItem {
   source_tag: string;
 }
 
+export type NearbyBusinessVerificationStatus =
+  | 'VERIFIED_DIRECTORY'
+  | 'OBSERVED_SIGNBOARD'
+  | 'UNIDENTIFIED_STOREFRONT';
+
+export interface VerifiedNearbyBusiness {
+  id: string;
+  name: string;
+  category: string;
+  distance_m?: number;
+  distance_label: string;
+  source: string;
+  verification_status: NearbyBusinessVerificationStatus;
+  confidence_label: string;
+  is_relevant_competitor: boolean;
+  notes?: string;
+}
+
+export interface NearbyCompetitorsSection {
+  provider_listed: VerifiedNearbyBusiness[];
+  visually_observed: VerifiedNearbyBusiness[];
+  has_relevant_competitors: boolean;
+  total_identified_competitors: number;
+  reliable_observed_names_count: number;
+  unidentified_storefronts_count: number;
+  empty_provider_note?: string;
+  empty_observed_note?: string;
+}
+
 export interface MarketEntryReportData {
   generated_at: string;
   data_mode: 'LIVE' | 'DEMO';
@@ -125,6 +154,9 @@ export interface MarketEntryReportData {
     }[];
     next_validation_step: string;
   };
+
+  /** B. RELEVANT NEARBY BUSINESSES (VERIFIED DIRECTORY + OBSERVED STOREFRONTS) */
+  nearbyCompetitors: NearbyCompetitorsSection;
 
   /** 2. MARKET OVERVIEW */
   marketOverview: {

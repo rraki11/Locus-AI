@@ -5,10 +5,12 @@ import {
   EvidenceLedgerRow,
   FinalPostureReason,
   MarketEntryReportData,
+  NearbyCompetitorsSection,
   PlainLanguageOutcome,
   PlainLanguageReasonItem,
   ReportLimitationItem,
   ShortDecisionPosture,
+  VerifiedNearbyBusiness,
 } from '../types/decisionReport';
 import {
   DecisionPostureLevel,
@@ -44,6 +46,81 @@ function findFactor(
 }
 
 /**
+ * Checks whether a candidate POI category or business name is relevant to user's selected business type.
+ */
+export function isCategoryOrNameRelevant(
+  businessType: string,
+  candidateCategory: string,
+  candidateName: string
+): boolean {
+  const normType = (businessType || '').toLowerCase();
+  const cat = (candidateCategory || '').toLowerCase();
+  const name = (candidateName || '').toLowerCase();
+
+  const foodKeywords = [
+    'cafe', 'café', 'coffee', 'tea', 'bakery', 'restaurant', 'fast food',
+    'qsr', 'snack', 'tiffin', 'diner', 'eatery', 'bar', 'food', 'biryani',
+    'pizza', 'burger', 'ice cream', 'sweets', 'juice', 'chaat', 'hotel', 'dhaba'
+  ];
+  const salonKeywords = [
+    'salon', 'spa', 'beauty', 'hair', 'grooming', 'parlour', 'parlor',
+    'barber', 'nails', 'skin', 'wellness', 'makeup'
+  ];
+  const fitnessKeywords = [
+    'gym', 'fitness', 'workout', 'crossfit', 'yoga', 'pilates', 'training',
+    'sports', 'martial arts', 'calisthenics'
+  ];
+  const retailKeywords = [
+    'store', 'retail', 'clothing', 'apparel', 'fashion', 'boutique', 'shop',
+    'footwear', 'supermarket', 'mart', 'grocer', 'optical', 'jewel', 'gift'
+  ];
+
+  if (normType.includes('cafe') || normType.includes('café') || normType.includes('coffee') || normType.includes('tea')) {
+    return foodKeywords.some((k) => cat.includes(k) || name.includes(k));
+  }
+  if (normType.includes('qsr') || normType.includes('fast food') || normType.includes('restaurant') || normType.includes('bakery')) {
+    return foodKeywords.some((k) => cat.includes(k) || name.includes(k));
+  }
+  if (normType.includes('salon') || normType.includes('wellness') || normType.includes('spa')) {
+    return salonKeywords.some((k) => cat.includes(k) || name.includes(k));
+  }
+  if (normType.includes('gym') || normType.includes('fitness')) {
+    return fitnessKeywords.some((k) => cat.includes(k) || name.includes(k));
+  }
+  if (normType.includes('retail') || normType.includes('store')) {
+    return retailKeywords.some((k) => cat.includes(k) || name.includes(k));
+  }
+
+  const words = normType.split(/[\s/,&]+/).filter((w) => w.length > 2);
+  return words.some((w) => cat.includes(w) || name.includes(w));
+}
+
+/**
+ * Validates whether an OCR read is clean and reliable enough to display as a recognized storefront name.
+ * Filters out garbled artifacts, camera labels, and low-confidence noise.
+ */
+export function isReliableOcrStorefrontName(
+  rawName: string,
+  confidence: number
+): boolean {
+  if (!rawName) return false;
+  const trimmed = rawName.trim();
+  if (trimmed.length < 3 || trimmed.length > 60) return false;
+
+  if (confidence > 0 && confidence < 0.58) return false;
+
+  if (/^obs[-_]entity/i.test(trimmed)) return false;
+  if (/signboard|crop variant|tesseract|keyframe|detection/i.test(trimmed)) return false;
+
+  const lettersOnly = trimmed.replace(/[^\p{L}\p{M}]/gu, '');
+  if (lettersOnly.length < 3) return false;
+
+  if (/^(.)\1{3,}$/.test(trimmed.replace(/\s+/g, ''))) return false;
+
+  return true;
+}
+
+/**
  * Pure deterministic builder that transforms accumulated state from
  * View 1 (Market Baseline), View 2 (Street Scan + Ground Truth Fusion),
  * and View 3 (Location Intelligence + Scenario Simulator) into
@@ -64,6 +141,12 @@ export function buildMarketEntryReport(
     scenarioAssumptions,
   } = handoff;
 
+  const safeAssumptions = scenarioAssumptions ?? {
+    rentDeltaPct: 0,
+    activityDeltaPct: 0,
+    competitionDeltaCount: 0,
+  };
+
   // Reuse existing View 3 comparison output if provided, or invoke the shared engine
   const comparison =
     handoff.intelligenceComparison ??
@@ -79,15 +162,15 @@ export function buildMarketEntryReport(
       },
       marketBaseline,
       streetScanFusion,
-      assumptions: scenarioAssumptions,
+      assumptions: safeAssumptions,
     });
 
   const baselineEval = comparison.baseline_evaluation;
   const activeEval = comparison.scenario_evaluation;
   const isScenarioModified =
-    scenarioAssumptions.rentDeltaPct !== 0 ||
-    scenarioAssumptions.activityDeltaPct !== 0 ||
-    scenarioAssumptions.competitionDeltaCount !== 0;
+    safeAssumptions.rentDeltaPct !== 0 ||
+    safeAssumptions.activityDeltaPct !== 0 ||
+    safeAssumptions.competitionDeltaCount !== 0;
 
   const streetScanExecuted = Boolean(streetScanFusion);
   const shortPosture = mapEnginePostureToShortPosture(
@@ -288,13 +371,16 @@ export function buildMarketEntryReport(
   // Add OBSERVED entities and activity signals from Street Scan (only if Street Scan ran)
   if (streetScanFusion) {
     for (const obs of streetScanFusion.deduplicated_entities) {
+      const frameCount = obs.frame_indices?.length ?? 1;
+      const firstSeen = typeof obs.first_seen_sec === 'number' ? obs.first_seen_sec.toFixed(1) : '0.0';
+      const lastSeen = typeof obs.last_seen_sec === 'number' ? obs.last_seen_sec.toFixed(1) : '0.0';
       evidenceLedger.push({
         id: `obs-${obs.entity_id}`,
         evidence: obs.display_name,
         source: 'Street Scan (OCR + Context)',
         type: 'OBSERVED',
         confidence: obs.confidence.toFixed(2),
-        interpretation: `Deduplicated storefront signage observed across ${obs.frame_indices.length} frame(s) (${obs.first_seen_sec.toFixed(1)}s–${obs.last_seen_sec.toFixed(1)}s).`,
+        interpretation: `Deduplicated storefront signage observed across ${frameCount} frame(s) (${firstSeen}s–${lastSeen}s).`,
       });
     }
 
@@ -309,7 +395,7 @@ export function buildMarketEntryReport(
     });
 
     // Add INFERRED reconciliation items from Street Scan Fusion
-    for (const rec of streetScanFusion.reconciled_ledger.slice(0, 5)) {
+    for (const rec of (streetScanFusion.reconciled_ledger || []).slice(0, 5)) {
       if (rec.reconciliation_status === 'MATCHED') {
         evidenceLedger.push({
           id: `inf-match-${rec.fusion_id}`,
@@ -360,7 +446,7 @@ export function buildMarketEntryReport(
   evidenceLedger.push({
     id: 'pred-scenario-sensitivity',
     evidence: isScenarioModified
-      ? `Scenario Delta: Rent ${formatSignedDelta(scenarioAssumptions.rentDeltaPct, '%')}, Activity ${formatSignedDelta(scenarioAssumptions.activityDeltaPct, '%')}, Competition ${formatSignedDelta(scenarioAssumptions.competitionDeltaCount, '')}`
+      ? `Scenario Delta: Rent ${formatSignedDelta(safeAssumptions.rentDeltaPct, '%')}, Activity ${formatSignedDelta(safeAssumptions.activityDeltaPct, '%')}, Competition ${formatSignedDelta(safeAssumptions.competitionDeltaCount, '')}`
       : 'Baseline Scenario (0% Rent, 0% Activity, 0 Competition delta)',
     source: 'LOCUS Scenario Simulator',
     type: 'PREDICTED_ANALYTICAL',
@@ -541,12 +627,12 @@ export function buildMarketEntryReport(
   }
 
   const sensitivityCaveat = isScenarioModified
-    ? `Evaluated under active scenario assumptions (Rent ${formatSignedDelta(scenarioAssumptions.rentDeltaPct, '%')}, Activity ${formatSignedDelta(scenarioAssumptions.activityDeltaPct, '%')}, Competition ${formatSignedDelta(scenarioAssumptions.competitionDeltaCount, '')}), shifting ${comparison.shifted_factors.length} intelligence factor(s) from baseline.`
+    ? `Evaluated under active scenario assumptions (Rent ${formatSignedDelta(safeAssumptions.rentDeltaPct, '%')}, Activity ${formatSignedDelta(safeAssumptions.activityDeltaPct, '%')}, Competition ${formatSignedDelta(safeAssumptions.competitionDeltaCount, '')}), shifting ${comparison.shifted_factors.length} intelligence factor(s) from baseline.`
     : 'Evaluated at current baseline assumptions (0% Rent delta, 0% Activity delta, 0 Competition delta). Adjust View 3 Scenario Simulator sliders to test downside or upside sensitivity.';
 
   // --- PLAIN-LANGUAGE EXECUTIVE OUTCOME & REASONING (FOR ORDINARY USERS) ---
   const hasBaseline = Boolean(marketBaseline && totalMapped > 0);
-  const rentDelta = scenarioAssumptions.rentDeltaPct;
+  const rentDelta = safeAssumptions.rentDeltaPct;
   const additionalSignals = streetScanFusion?.counts.additional_signals ?? 0;
   const observedEntities = streetScanFusion?.counts.observed_entities ?? 0;
   const budgetText = profile.budget
@@ -836,6 +922,132 @@ export function buildMarketEntryReport(
   // Most useful next validation step
   let nextValidationStep = whatToDoBeforeSpending;
 
+  // --- B. RELEVANT NEARBY BUSINESSES (PROVIDER LISTED + OBSERVED STOREFRONTS) ---
+  const allBaselinePlaces = [
+    ...(marketBaseline?.bands['0-300m']?.places ?? []),
+    ...(marketBaseline?.bands['300m-2km']?.places ?? []).slice(0, 6),
+  ];
+
+  const seenPlaceIds = new Set<string>();
+  const providerListed: VerifiedNearbyBusiness[] = [];
+
+  for (const place of allBaselinePlaces) {
+    if (!place || !place.place_id || seenPlaceIds.has(place.place_id)) continue;
+    seenPlaceIds.add(place.place_id);
+
+    const isRelevant = isCategoryOrNameRelevant(
+      profile.businessType,
+      place.category,
+      place.business_name
+    );
+
+    providerListed.push({
+      id: `prov-${place.place_id}`,
+      name: place.business_name || 'Commercial Storefront',
+      category: place.category || 'Retail Storefront',
+      distance_m: typeof place.distance_m === 'number' ? place.distance_m : undefined,
+      distance_label:
+        typeof place.distance_m === 'number'
+          ? `${place.distance_m}m away (${place.spatial_band})`
+          : place.spatial_band || '0–300m corridor',
+      source: place.source || 'Google Places',
+      verification_status: 'VERIFIED_DIRECTORY',
+      confidence_label:
+        place.confidence === 'HIGH'
+          ? 'High Confidence Listing'
+          : 'Verified Directory Listing',
+      is_relevant_competitor: isRelevant,
+      notes: place.vicinity,
+    });
+  }
+
+  // Prioritize relevant competitors first, then sort by distance
+  providerListed.sort((a, b) => {
+    if (a.is_relevant_competitor !== b.is_relevant_competitor) {
+      return a.is_relevant_competitor ? -1 : 1;
+    }
+    return (a.distance_m ?? 999) - (b.distance_m ?? 999);
+  });
+
+  const visuallyObserved: VerifiedNearbyBusiness[] = [];
+  let reliableObservedCount = 0;
+  let unidentifiedStorefrontCount = 0;
+
+  if (streetScanFusion && Array.isArray(streetScanFusion.deduplicated_entities)) {
+    const seenObsIds = new Set<string>();
+    for (const obs of streetScanFusion.deduplicated_entities) {
+      if (!obs || seenObsIds.has(obs.entity_id)) continue;
+      seenObsIds.add(obs.entity_id);
+
+      const isReliable = isReliableOcrStorefrontName(obs.display_name, obs.confidence);
+      if (isReliable) {
+        reliableObservedCount += 1;
+        const isRel = isCategoryOrNameRelevant(profile.businessType, '', obs.display_name);
+        visuallyObserved.push({
+          id: `obs-${obs.entity_id}`,
+          name: obs.display_name,
+          category: 'Observed Storefront Signage',
+          distance_label: '0–300m physical corridor',
+          source: 'Street Scan (Tesseract OCR)',
+          verification_status: 'OBSERVED_SIGNBOARD',
+          confidence_label: `Signboard OCR (${Math.round(obs.confidence * 100)}%)`,
+          is_relevant_competitor: isRel,
+          notes: obs.nearby_activity_context || 'Observed in camera corridor footage.',
+        });
+      } else {
+        unidentifiedStorefrontCount += 1;
+        visuallyObserved.push({
+          id: `obs-${obs.entity_id}`,
+          name: 'Unidentified storefront',
+          category: 'Signboard Detected · Text Unverified',
+          distance_label: '0–300m physical corridor',
+          source: 'Street Scan (Visual Detection)',
+          verification_status: 'UNIDENTIFIED_STOREFRONT',
+          confidence_label: 'Visual Activity Only',
+          is_relevant_competitor: false,
+          notes: 'Storefront signage detected, but text was unverified or low-contrast.',
+        });
+      }
+    }
+  }
+
+  // Sort observed: reliable recognized names first, then unidentified storefronts
+  visuallyObserved.sort((a, b) => {
+    if (a.verification_status !== b.verification_status) {
+      return a.verification_status === 'OBSERVED_SIGNBOARD' ? -1 : 1;
+    }
+    if (a.is_relevant_competitor !== b.is_relevant_competitor) {
+      return a.is_relevant_competitor ? -1 : 1;
+    }
+    return 0;
+  });
+
+  const totalIdentifiedCompetitors =
+    providerListed.filter((p) => p.is_relevant_competitor).length +
+    visuallyObserved.filter((o) => o.is_relevant_competitor).length;
+
+  const emptyProviderNote =
+    providerListed.length === 0
+      ? 'No mapped business listings were returned by the directory provider within the 0–300m catchment. This indicates directory coverage limits or an informal/unindexed commercial strip, not proof of zero competition.'
+      : undefined;
+
+  const emptyObservedNote = !streetScanExecuted
+    ? 'Street Scan was not executed for this candidate location. Physical storefronts, informal stalls, and signboards along the 0–300m corridor remain unverified on the ground.'
+    : visuallyObserved.length === 0
+    ? 'No distinct commercial storefronts or signboards were detected along the recorded 0–300m corridor.'
+    : undefined;
+
+  const nearbyCompetitors: NearbyCompetitorsSection = {
+    provider_listed: providerListed.slice(0, 8),
+    visually_observed: visuallyObserved.slice(0, 6),
+    has_relevant_competitors: totalIdentifiedCompetitors > 0,
+    total_identified_competitors: totalIdentifiedCompetitors,
+    reliable_observed_names_count: reliableObservedCount,
+    unidentified_storefronts_count: unidentifiedStorefrontCount,
+    empty_provider_note: emptyProviderNote,
+    empty_observed_note: emptyObservedNote,
+  };
+
   return {
     generated_at: comparison.evaluated_at,
     data_mode: activeEval.data_mode,
@@ -877,6 +1089,8 @@ export function buildMarketEntryReport(
       next_validation_step: nextValidationStep,
     },
 
+    nearbyCompetitors,
+
     marketOverview,
     groundReality,
     mapVsReality,
@@ -889,12 +1103,12 @@ export function buildMarketEntryReport(
     scenario: {
       is_modified: isScenarioModified,
       label: 'SCENARIO IMPACT / SENSITIVITY ANALYSIS',
-      assumptions: scenarioAssumptions,
+      assumptions: safeAssumptions,
       formatted_deltas: {
-        rent: formatSignedDelta(scenarioAssumptions.rentDeltaPct, '%'),
-        activity: formatSignedDelta(scenarioAssumptions.activityDeltaPct, '%'),
+        rent: formatSignedDelta(safeAssumptions.rentDeltaPct, '%'),
+        activity: formatSignedDelta(safeAssumptions.activityDeltaPct, '%'),
         competition: formatSignedDelta(
-          scenarioAssumptions.competitionDeltaCount,
+          safeAssumptions.competitionDeltaCount,
           ''
         ),
       },
