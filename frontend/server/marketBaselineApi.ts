@@ -695,7 +695,6 @@ export function buildNormalizedMarketBaseline(params: {
     city,
     localArea,
     label,
-    businessType,
     targetCustomer,
     mapping,
     places,

@@ -15,6 +15,7 @@ import {
   scoreOcrRead,
   cleanOcrText,
 } from './signboardOcrEngine';
+import { handleStreetScanFusion } from '../../server/streetScanApi';
 
 export interface SampledFramePreview {
   frame_index: number;
@@ -578,6 +579,42 @@ async function extractFusionErrorMessage(res: Response): Promise<string> {
 }
 
 /**
+ * Executes corridor fusion via /api/street-scan/fuse with automatic browser-side fallback.
+ * Ensures the scan pipeline is resilient against HTTP 500, network errors, or deployment cold-starts.
+ */
+export async function executeStreetScanFusion(
+  payload: StreetScanFuseRequest
+): Promise<StreetScanFusionResponse> {
+  try {
+    const res = await fetch('/api/street-scan/fuse', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      return (await res.json()) as StreetScanFusionResponse;
+    }
+
+    const errorDetails = await extractFusionErrorMessage(res);
+    console.warn(
+      `[StreetScan] /api/street-scan/fuse returned ${res.status} (${errorDetails}). Seamlessly falling back to browser-side corridor fusion engine.`
+    );
+  } catch (netErr) {
+    console.warn(
+      '[StreetScan] /api/street-scan/fuse network error. Seamlessly falling back to browser-side corridor fusion engine:',
+      netErr
+    );
+  }
+
+  // Pure deterministic browser-side corridor fusion fallback
+  return handleStreetScanFusion(payload);
+}
+
+/**
  * Runs the end-to-end Live Video Street Scan pipeline in the browser and fuses via /api/street-scan/fuse.
  */
 export async function runLiveVideoStreetScan(params: {
@@ -1073,21 +1110,7 @@ export async function runLiveVideoStreetScan(params: {
       baseline_places_local: baselinePlacesLocal,
     };
 
-    const res = await fetch('/api/street-scan/fuse', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(fusePayload),
-    });
-
-    if (!res.ok) {
-      const errorMsg = await extractFusionErrorMessage(res);
-      throw new Error(errorMsg);
-    }
-
-    const fusionResponse = (await res.json()) as StreetScanFusionResponse;
+    const fusionResponse = await executeStreetScanFusion(fusePayload);
 
     const framePreviews: SampledFramePreview[] = extractedFrames.map((f) => ({
       frame_index: f.frame_index,
@@ -1534,21 +1557,7 @@ export async function runPhotoBatchStreetScan(params: {
     baseline_places_local: baselinePlacesLocal,
   };
 
-  const res = await fetch('/api/street-scan/fuse', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(fusePayload),
-  });
-
-  if (!res.ok) {
-    const errorMsg = await extractFusionErrorMessage(res);
-    throw new Error(errorMsg);
-  }
-
-  const fusionResponse = (await res.json()) as StreetScanFusionResponse;
+  const fusionResponse = await executeStreetScanFusion(fusePayload);
 
   const framePreviews: SampledFramePreview[] = processedFrames.map((f) => ({
     frame_index: f.frame_index,
@@ -1841,21 +1850,7 @@ export async function runCalibratedDemoStreetScan(params: {
     baseline_places_local: baselinePlacesLocal,
   };
 
-  const res = await fetch('/api/street-scan/fuse', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(fusePayload),
-  });
-
-  if (!res.ok) {
-    const errorMsg = await extractFusionErrorMessage(res);
-    throw new Error(errorMsg);
-  }
-
-  const fusionResponse = (await res.json()) as StreetScanFusionResponse;
+  const fusionResponse = await executeStreetScanFusion(fusePayload);
 
   onProgress({
     stage: 'COMPLETE',

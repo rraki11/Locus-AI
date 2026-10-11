@@ -1,4 +1,4 @@
-import { NodeHttpRequest, NodeHttpResponse } from './marketBaselineApi';
+import type { NodeHttpRequest, NodeHttpResponse } from './marketBaselineApi';
 import {
   BASELINE_SCENARIO_ASSUMPTIONS,
   compareBaselineAndScenarioIntelligence,

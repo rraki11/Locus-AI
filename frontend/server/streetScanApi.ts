@@ -1,4 +1,4 @@
-import {
+import type {
   CategoricalLevel,
   NodeHttpRequest,
   NodeHttpResponse,
@@ -254,7 +254,7 @@ export function formatCleanDisplayName(raw: unknown, normalized: unknown): strin
  * Unicode-safe: Indic scripts are preserved without requiring Latin characters.
  */
 export function isPlausibleStorefrontOcr(
-  rawText: unknown,
+  _rawText: unknown,
   normalizedText: unknown,
   confidence: unknown
 ): boolean {
@@ -402,9 +402,9 @@ function buildFrameObjectContextNote(
       if (!c) continue;
       countsInFrame.set(c, (countsInFrame.get(c) || 0) + 1);
     }
-    for (const [cls, cnt] of countsInFrame.entries()) {
+    countsInFrame.forEach((cnt, cls) => {
       peakByClass.set(cls, Math.max(peakByClass.get(cls) || 0, cnt));
-    }
+    });
   }
 
   if (peakByClass.size === 0) {
@@ -592,7 +592,7 @@ function aggregateCocoActivity(frames: NormalizedFrameObservation[]) {
       peakPedestriansInFrame = framePersons;
     }
 
-    for (const [cls, fStat] of frameCounts.entries()) {
+    frameCounts.forEach((fStat, cls) => {
       const agg = byClass.get(cls) || {
         total: 0,
         framesPresent: 0,
@@ -604,7 +604,7 @@ function aggregateCocoActivity(frames: NormalizedFrameObservation[]) {
       agg.peak = Math.max(agg.peak, fStat.count);
       agg.confSum += fStat.confSum;
       byClass.set(cls, agg);
-    }
+    });
   }
 
   const classBreakdown: CocoClassAggregate[] = Array.from(byClass.entries())
